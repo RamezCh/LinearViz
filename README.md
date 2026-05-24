@@ -10,8 +10,8 @@ Rather than treating linear algebra as dry algebraic formulas and symbol-pushing
 
 ```mermaid
 flowchart TB
-    subgraph App["Application Layer"]
-        App[App.jsx]
+    subgraph AppLayer["Application Layer"]
+        AppFile[App.jsx]
         Nav[Navigation]
         Side[Sidebar]
     end
@@ -34,9 +34,9 @@ flowchart TB
         Store[State Management]
     end
 
-    App --> Nav
-    App --> Side
-    App --> Modules
+    AppFile --> Nav
+    AppFile --> Side
+    AppFile --> Modules
     Modules --> Shared
     Store --> Canvas
 ```
