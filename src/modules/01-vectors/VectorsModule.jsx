@@ -25,6 +25,9 @@ export default function VectorsModule() {
   const [dragging, setDragging] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [editName, setEditName] = useState('');
+  const [activeId1, setActiveId1] = useState(1);
+  const [activeId2, setActiveId2] = useState(2);
+  const [sumIds, setSumIds] = useState([1, 2]);
   const canvasRef = useRef(null);
   const isPanning = useRef(false);
   const lastPos = useRef({ x: 0, y: 0 });
@@ -115,16 +118,56 @@ export default function VectorsModule() {
       { id: 2, name: 'b', coords: [1, -1], color: 'oklch(52% 0.160 155)' },
     ]);
     setSelectedId(1);
+    setActiveId1(1);
+    setActiveId2(2);
+    setSumIds([1, 2]);
     setZoom(1.2);
     setPan({ x: 0, y: 0 });
   };
 
-  const v1 = vectors[0], v2 = vectors[1];
+  // Sync active math vectors when vectors are deleted or modified
+  useEffect(() => {
+    if (vectors.length === 0) return;
+    
+    // Ensure activeId1 points to an existing vector
+    const hasV1 = vectors.some(v => v.id === activeId1);
+    let nextId1 = activeId1;
+    if (!hasV1) {
+      nextId1 = vectors[0].id;
+      setActiveId1(nextId1);
+    }
+
+    // Ensure activeId2 points to an existing vector
+    const hasV2 = vectors.some(v => v.id === activeId2);
+    if (!hasV2 || activeId2 === nextId1) {
+      const remaining = vectors.filter(v => v.id !== nextId1);
+      if (remaining.length > 0) {
+        setActiveId2(remaining[0].id);
+      } else {
+        setActiveId2(nextId1);
+      }
+    }
+
+    // Ensure sumIds only contains existing vectors
+    setSumIds(prev => {
+      const filtered = prev.filter(id => vectors.some(v => v.id === id));
+      if (filtered.length === 0 && vectors.length > 0) {
+        return vectors.slice(0, 2).map(v => v.id);
+      }
+      return filtered;
+    });
+  }, [vectors, activeId1, activeId2]);
+
+  const v1 = useMemo(() => vectors.find(v => v.id === activeId1) || vectors[0] || null, [vectors, activeId1]);
+  const v2 = useMemo(() => vectors.find(v => v.id === activeId2) || vectors[1] || null, [vectors, activeId2]);
+
+  const activeSumVectors = useMemo(() => vectors.filter(v => sumIds.includes(v.id)), [vectors, sumIds]);
 
   const sumVec = useMemo(() => {
-    if (!v1 || !v2) return null;
-    return { name: 'Σ', coords: [v1.coords[0] + v2.coords[0], v1.coords[1] + v2.coords[1]], color: 'var(--color-accent)' };
-  }, [v1, v2]);
+    if (activeSumVectors.length === 0) return null;
+    const coords = activeSumVectors.reduce((acc, v) => [acc[0] + v.coords[0], acc[1] + v.coords[1]], [0, 0]);
+    return { name: 'Σ', coords, color: 'var(--color-accent)' };
+  }, [activeSumVectors]);
 
   const dotProd = useMemo(() => {
     if (!v1 || !v2) return 0;
@@ -297,7 +340,7 @@ export default function VectorsModule() {
   };
 
   const renderAngleArc = () => {
-    if (!v1 || !v2 || !showAngle) return null;
+    if (!v1 || !v2 || !showAngle || v1.id === v2.id) return null;
     const a1 = Math.atan2(v1.coords[1], v1.coords[0]);
     const a2 = Math.atan2(v2.coords[1], v2.coords[0]);
     let diff = a2 - a1;
@@ -342,19 +385,22 @@ export default function VectorsModule() {
   };
 
   const renderParallelogram = () => {
-    if (!showSum || !v1 || !v2 || !sumVec) return null;
+    const active = vectors.filter(v => sumIds.includes(v.id));
+    if (!showSum || active.length !== 2 || !sumVec) return null;
+    const v1 = active[0], v2 = active[1];
+    if (v1.id === v2.id) return null;
+
     const o = toCanvas(0, 0);
     const a = toCanvas(v1.coords[0], v1.coords[1]);
     const b = toCanvas(v2.coords[0], v2.coords[1]);
-    const sCoord = [v1.coords[0] + v2.coords[0], v1.coords[1] + v2.coords[1]];
-    const s = toCanvas(sCoord[0], sCoord[1]);
+    const s = toCanvas(sumVec.coords[0], sumVec.coords[1]);
     const cx = (o.x + a.x + s.x + b.x) / 4;
     const cy = (o.y + a.y + s.y + b.y) / 4;
     return (
       <g>
         <polygon points={`${o.x},${o.y} ${a.x},${a.y} ${s.x},${s.y} ${b.x},${b.y}`}
-          fill="var(--color-accent)" fillOpacity="0.10"
-          stroke="var(--color-accent)" strokeWidth="1.5" strokeDasharray="6 3" strokeOpacity="0.5" />
+          fill="var(--color-accent)" fillOpacity="0.08"
+          stroke="var(--color-accent)" strokeWidth="1.5" strokeDasharray="6 3" strokeOpacity="0.4" />
         <text x={cx} y={cy} fill="oklch(65% 0.100 70)" fontSize="10" fontWeight="700"
           fontFamily="var(--font-mono)" textAnchor="middle" dominantBaseline="middle"
           opacity="0.7">
@@ -362,6 +408,44 @@ export default function VectorsModule() {
         </text>
       </g>
     );
+  };
+
+  const renderTipToTailChain = () => {
+    if (!showSum) return null;
+    const active = vectors.filter(v => sumIds.includes(v.id));
+    if (active.length < 3) return null;
+
+    const segments = [];
+    let currentPos = [0, 0];
+    const startVec = active[0];
+    currentPos = [...startVec.coords];
+    
+    for (let i = 1; i < active.length; i++) {
+      const v = active[i];
+      const nextPos = [currentPos[0] + v.coords[0], currentPos[1] + v.coords[1]];
+      const fromCanvasPos = toCanvas(currentPos[0], currentPos[1]);
+      const toCanvasPos = toCanvas(nextPos[0], nextPos[1]);
+      
+      segments.push(
+        <g key={`chain-${v.id}-${i}`}>
+          {renderArrow(fromCanvasPos, toCanvasPos, v.color, 2, true)}
+          <text
+            x={(fromCanvasPos.x + toCanvasPos.x) / 2}
+            y={(fromCanvasPos.y + toCanvasPos.y) / 2 - 8}
+            fill={v.color}
+            fontSize="10"
+            fontWeight="700"
+            fontFamily="var(--font-mono)"
+            textAnchor="middle"
+            opacity="0.8"
+          >
+            {v.name}
+          </text>
+        </g>
+      );
+      currentPos = nextPos;
+    }
+    return segments;
   };
 
   const renderVector = (vec) => {
@@ -452,40 +536,41 @@ export default function VectorsModule() {
         <div className="flex-1" />
 
         {/* Quick math display */}
-        {v1 && v2 && (
-          <div className="hidden lg:flex items-center gap-1.5 text-xs font-mono">
-            <div
-              className="px-2 py-0.5 rounded-lg font-semibold"
-              style={{
-                backgroundColor: 'var(--color-paper-2)',
-                color: 'oklch(52% 0.160 25)',
-                fontFamily: 'var(--font-mono)',
-              }}
-            >
-              [{v1.coords[0].toFixed(1)}, {v1.coords[1].toFixed(1)}]
-            </div>
-            <span className="text-sm font-light" style={{ color: 'var(--color-muted)' }}>+</span>
-            <div
-              className="px-2 py-0.5 rounded-lg font-semibold"
-              style={{
-                backgroundColor: 'var(--color-paper-2)',
-                color: 'oklch(52% 0.160 155)',
-                fontFamily: 'var(--font-mono)',
-              }}
-            >
-              [{v2.coords[0].toFixed(1)}, {v2.coords[1].toFixed(1)}]
-            </div>
-            <span className="text-sm font-light" style={{ color: 'var(--color-muted)' }}>=</span>
-            <div
-              className="px-2 py-0.5 rounded-lg font-semibold"
-              style={{
-                backgroundColor: 'var(--color-accent)',
-                color: 'var(--color-paper)',
-                fontFamily: 'var(--font-mono)',
-              }}
-            >
-              [{sumVec?.coords[0].toFixed(1)}, {sumVec?.coords[1].toFixed(1)}]
-            </div>
+        {activeSumVectors.length > 0 && (
+          <div className="hidden lg:flex items-center gap-1.5 text-xs font-mono flex-wrap">
+            {activeSumVectors.map((v, idx) => (
+              <span key={v.id} className="flex items-center gap-1">
+                {idx > 0 && <span className="text-sm font-light mr-1" style={{ color: 'var(--color-muted)' }}>+</span>}
+                <span className="font-bold mr-0.5" style={{ color: v.color }}>{v.name}</span>
+                <div
+                  className="px-2 py-0.5 rounded-lg font-semibold"
+                  style={{
+                    backgroundColor: 'var(--color-paper-2)',
+                    color: v.color,
+                    fontFamily: 'var(--font-mono)',
+                  }}
+                >
+                  [{v.coords[0].toFixed(1)}, {v.coords[1].toFixed(1)}]
+                </div>
+              </span>
+            ))}
+            
+            {activeSumVectors.length >= 2 && sumVec && (
+              <>
+                <span className="text-sm font-light" style={{ color: 'var(--color-muted)' }}>=</span>
+                <span className="font-bold text-accent">Σ</span>
+                <div
+                  className="px-2 py-0.5 rounded-lg font-semibold"
+                  style={{
+                    backgroundColor: 'var(--color-accent)',
+                    color: 'var(--color-paper)',
+                    fontFamily: 'var(--font-mono)',
+                  }}
+                >
+                  [{sumVec.coords[0].toFixed(1)}, {sumVec.coords[1].toFixed(1)}]
+                </div>
+              </>
+            )}
           </div>
         )}
 
@@ -694,6 +779,7 @@ export default function VectorsModule() {
                 );
               })()}
               {renderParallelogram()}
+              {renderTipToTailChain()}
               {vectors.map(renderVector)}
               {showSum && sumVec && (() => {
                 const sumTip = toCanvas(sumVec.coords[0], sumVec.coords[1]);
@@ -767,6 +853,24 @@ export default function VectorsModule() {
                         if (!isSelected) e.currentTarget.style.backgroundColor = 'transparent';
                       }}
                     >
+                      {/* Checkbox for sum inclusion */}
+                      <input
+                        type="checkbox"
+                        checked={sumIds.includes(vec.id)}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          if (sumIds.includes(vec.id)) {
+                            if (sumIds.length > 1) {
+                              setSumIds(prev => prev.filter(id => id !== vec.id));
+                            }
+                          } else {
+                            setSumIds(prev => [...prev, vec.id]);
+                          }
+                        }}
+                        className="w-3.5 h-3.5 rounded border-gray-300 cursor-pointer flex-shrink-0"
+                        style={{ accentColor: 'var(--color-accent)' }}
+                        title="Include in Sum Addition"
+                      />
                       {/* Color dot */}
                       <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: vec.color }} />
                       {/* Name */}
@@ -819,6 +923,75 @@ export default function VectorsModule() {
             }}
           >
             <div className="p-3 space-y-3">
+
+              {/* Target Vector Selector */}
+              {vectors.length >= 2 && (
+                <div
+                  className="p-3 rounded-xl border transition-all duration-150"
+                  style={{
+                    backgroundColor: 'var(--color-paper-2)',
+                    borderColor: 'var(--color-rule)',
+                  }}
+                >
+                  <div className="font-semibold mb-2.5 text-xs" style={{ color: 'var(--color-neutral)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                    Math Target Vectors
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <label className="block mb-1 font-medium" style={{ color: 'var(--color-muted)' }}>First Vector</label>
+                      <select
+                        value={activeId1}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          if (val === activeId2 && vectors.length > 1) {
+                            setActiveId2(activeId1);
+                          }
+                          setActiveId1(val);
+                        }}
+                        className="w-full px-2 py-1.5 rounded-lg border outline-none font-semibold cursor-pointer transition-all focus:border-accent"
+                        style={{
+                          backgroundColor: 'var(--color-paper)',
+                          borderColor: 'var(--color-rule)',
+                          color: 'var(--color-ink)',
+                          fontFamily: 'var(--font-mono)',
+                        }}
+                      >
+                        {vectors.map(v => (
+                          <option key={v.id} value={v.id} style={{ color: v.color }}>
+                            {v.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block mb-1 font-medium" style={{ color: 'var(--color-muted)' }}>Second Vector</label>
+                      <select
+                        value={activeId2}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          if (val === activeId1 && vectors.length > 1) {
+                            setActiveId1(activeId2);
+                          }
+                          setActiveId2(val);
+                        }}
+                        className="w-full px-2 py-1.5 rounded-lg border outline-none font-semibold cursor-pointer transition-all focus:border-accent"
+                        style={{
+                          backgroundColor: 'var(--color-paper)',
+                          borderColor: 'var(--color-rule)',
+                          color: 'var(--color-ink)',
+                          fontFamily: 'var(--font-mono)',
+                        }}
+                      >
+                        {vectors.map(v => (
+                          <option key={v.id} value={v.id} style={{ color: v.color }}>
+                            {v.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Selected Vector Details */}
               {selectedVec && (
@@ -917,18 +1090,29 @@ export default function VectorsModule() {
               )}
 
               {/* Addition */}
-              {vectors.length >= 2 && v1 && v2 && (
+              {activeSumVectors.length >= 1 && (
                 <div className="p-3 rounded-xl" style={{ backgroundColor: 'var(--color-paper-2)' }}>
                   <div className="font-semibold mb-1 text-xs" style={{ color: 'var(--color-neutral)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
                     Vector Addition
                   </div>
-                  <div className="text-xs mb-2" style={{ color: 'var(--color-muted)' }}>
-                    Add matching coordinates: x₁+x₂, y₁+y₂
+                  <div className="text-xs mb-2.5" style={{ color: 'var(--color-muted)' }}>
+                    Add matching coordinates across all active vectors:
                   </div>
                   <div className="space-y-1.5 font-mono text-xs" style={{ color: 'var(--color-muted)', fontFamily: 'var(--font-mono)' }}>
-                    <div>{v1.name} + {v2.name}</div>
+                    <div className="flex items-center gap-1 flex-wrap">
+                      {activeSumVectors.map((v, i) => (
+                        <span key={v.id}>
+                          {i > 0 && " + "}
+                          <span className="font-bold" style={{ color: v.color }}>{v.name}</span>
+                        </span>
+                      ))}
+                    </div>
                     <div className="text-center" style={{ color: 'var(--color-rule-2)' }}>=</div>
-                    <div>[{v1.coords[0].toFixed(2)} + {v2.coords[0].toFixed(2)}, {v1.coords[1].toFixed(2)} + {v2.coords[1].toFixed(2)}]</div>
+                    <div className="leading-relaxed">
+                      [{activeSumVectors.map(v => v.coords[0].toFixed(1)).join(' + ')},
+                      <br />
+                      &nbsp;{activeSumVectors.map(v => v.coords[1].toFixed(1)).join(' + ')}]
+                    </div>
                     <div className="text-center" style={{ color: 'var(--color-rule-2)' }}>=</div>
                     <div
                       className="font-bold text-center py-1.5 rounded-xl"
@@ -940,12 +1124,14 @@ export default function VectorsModule() {
                     >
                       [{sumVec?.coords[0].toFixed(2)}, {sumVec?.coords[1].toFixed(2)}]
                     </div>
-                    <div
-                      className="text-xs pt-1.5 mt-1.5 border-t"
-                      style={{ color: 'var(--color-muted)', borderColor: 'var(--color-rule)', fontFamily: 'var(--font-mono)' }}
-                    >
-                      |Σ| = √({(sumVec?.coords[0] ** 2 + sumVec?.coords[1] ** 2).toFixed(2)}) = {magnitude(sumVec?.coords || [0,0]).toFixed(3)}
-                    </div>
+                    {sumVec && (
+                      <div
+                        className="text-xs pt-1.5 mt-1.5 border-t"
+                        style={{ color: 'var(--color-muted)', borderColor: 'var(--color-rule)', fontFamily: 'var(--font-mono)' }}
+                      >
+                        |Σ| = √({(sumVec.coords[0] ** 2 + sumVec.coords[1] ** 2).toFixed(2)}) = {magnitude(sumVec.coords).toFixed(3)}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

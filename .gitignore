@@ -1,4 +1,4 @@
-# Logs
+# Logs and Debugs
 logs
 *.log
 npm-debug.log*
@@ -7,18 +7,50 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
+# Dependencies
+node_modules/
+jspm_packages/
+web_modules/
+
+# Production / Build Outputs
+dist/
+dist-ssr/
+build/
+out/
+.next/
+
+# Local Environment Variables and Files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
 *.local
 
-# Editor directories and files
+# Editor and IDE Settings
 .vscode/*
 !.vscode/extensions.json
-.idea
+.idea/
 .DS_Store
+Thumbs.db
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+
+# Testing Caches and Outputs
+coverage/
+.nyc_output/
+
+# Tool Caches
+.eslintcache
+.stylelintcache
+.parcel-cache
+.cache/
+.yarn-integrity
+
+# AI Assistant & Gemini Workspace Configs
+.gemini/
+.antigravity/
