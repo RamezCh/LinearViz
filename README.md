@@ -1,118 +1,252 @@
-# 📐 LinearViz — Premium Interactive Linear Algebra Visualizer
+# LinearVis - Interactive Linear Algebra Visualizer
 
-LinearViz is a high-fidelity, interactive, and visually stunning web application designed to help students, educators, and researchers build a deep, intuitive geometric understanding of Linear Algebra. 
+LinearVis is a high-fidelity, interactive web application designed to help students, educators, and researchers build a deep, intuitive geometric understanding of Linear Algebra.
 
-Rather than treating linear algebra as dry algebraic formulas and symbol-pushing, LinearViz bridges the gap between numbers and space—allowing users to touch, drag, transform, and decompose mathematical objects in real time.
-
----
-
-## 🌟 Features Overview
-
-LinearViz consists of **9 highly specialized interactive modules** covering fundamental and advanced topics in linear algebra:
-
-1. **Vectors Module**:
-   - **Dynamic Manipulation**: Drag vector tips in real-time on a coordinate grid.
-   - **Flexible Operations Selector**: Choose any two vectors to perform addition ($\Sigma$), calculate their dot product ($a \cdot b$), or show the angle ($\theta$) between them.
-   - **Geometric Parallelogram**: Automatic tip-to-tail parallelogram visualizer to illustrate geometric vector addition.
-   - **Guided Learning Journey**: Step-by-step interactive card deck guiding beginners through the core concepts.
-
-2. **Matrix Operations**:
-   - Visualizing matrix-vector and matrix-matrix multiplication.
-   - Step-by-step arithmetic grids showing dot product alignments and dimensions.
-   - Visual transpose and property checkers.
-
-3. **Linear Transformations**:
-   - Apply arbitrary $2 \times 2$ matrices $A$ to standard shapes (grid, circle, house).
-   - Dynamic animations of shear, rotation, scaling, and reflection.
-   - Real-time coordinates tracking.
-
-4. **Determinants**:
-   - Watch the unit area scale, flip, or collapse as you adjust matrix columns.
-   - Clear visual representation of negative orientation and zero-area singularity.
-
-5. **Linear Systems**:
-   - Visualize system equations ($Ax = b$) as intersecting lines in a 2D plane.
-   - Interactive sliders to shift variables and watch the system move to consistency or inconsistency.
-
-6. **Vector Spaces**:
-   - Explore concepts of **span**, **basis**, and **linear independence**.
-   - Watch the span collapse from $\mathbb{R}^2$ to a 1D line or 0D point as basis vectors become collinear.
-
-7. **Orthogonality & Gram-Schmidt**:
-   - Interactive projection of one vector onto another.
-   - Step-by-step orthogonalization animation (making a basis mutually perpendicular).
-
-8. **Eigenvalues & Eigenvectors**:
-   - Drag test vectors to see if they maintain their span under matrix transformation.
-   - Real-time trace of the characteristic equation and dynamic eigenvalue scaling.
-
-9. **SVD (Singular Value Decomposition)**:
-   - Deep three-stage visual breakdown of $A = U \Sigma V^T$.
-   - Interactive representation of rotation ($V^T$), scaling ($\Sigma$), and second rotation ($U$).
+Rather than treating linear algebra as dry algebraic formulas and symbol-pushing, LinearVis bridges the gap between numbers and space, allowing users to touch, drag, transform, and decompose mathematical objects in real time.
 
 ---
 
-## 🎨 Design Philosophy
+## Architecture Overview
 
-LinearViz is built around the modern **Plume Design System**:
-- **Palette**: Sleek neutral paper backgrounds with vibrant, carefully tuned OKLCH color accents (avoiding harsh primaries).
-- **Responsive Layout**: Fluid flex panels, adaptable sidebar drawers, and automatic layout scaling utilizing high-performance `ResizeObserver`.
-- **Aesthetic Math**: Typeset formulas using high-speed KaTeX integration.
-- **Dynamic Feedback**: Micro-interactions, custom transition systems, and rich dark/light adaptive elements.
+```mermaid
+flowchart TB
+    subgraph App["Application Layer"]
+        App[App.jsx]
+        Nav[Navigation]
+        Side[Sidebar]
+    end
+
+    subgraph Modules["Interactive Modules"]
+        V1[Vectors]
+        M2[Matrices]
+        T3[Transformations]
+        D4[Determinants]
+        S5[Systems]
+        VS6[Vector Spaces]
+        O7[Orthogonality]
+        E8[Eigenvalues]
+        SVD9[SVD]
+    end
+
+    subgraph Shared["Shared Components"]
+        Canvas[Canvas Rendering]
+        UI[UI Components]
+        Store[State Management]
+    end
+
+    App --> Nav
+    App --> Side
+    App --> Modules
+    Modules --> Shared
+    Store --> Canvas
+```
 
 ---
 
-## 🚀 Getting Started
+## Module Overview
 
-Follow these steps to run LinearViz locally on your computer:
+```mermaid
+graph LR
+    subgraph Fundamentals["Fundamental Concepts"]
+        V[Vectors] --> M[Matrices]
+        M --> D[Determinants]
+    end
+
+    subgraph Applications["Practical Applications"]
+        D --> I[Inverse Matrices]
+        I --> T[Transformations]
+        T --> O[Orthogonality]
+        O --> GS[Gram-Schmidt]
+    end
+
+    subgraph Advanced["Advanced Topics"]
+        GS --> E[Eigenvalues]
+        E --> SVD[SVD]
+    end
+
+    subgraph Systems["Systems & Spaces"]
+        M --> S[Systems]
+        V --> VS[Vector Spaces]
+    end
+```
+
+---
+
+## Core Features
+
+### Vectors Module
+
+The Vectors module provides foundational linear algebra visualization with:
+
+- **Real-time Manipulation**: Drag vector tips on an interactive coordinate grid
+- **Vector Operations**: Addition, dot product, and angle calculations between any two vectors
+- **Sum Animation**: Step-by-step visualization of tip-to-tail vector addition
+- **Guided Learning**: Interactive card deck for beginners covering core concepts
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Canvas
+    participant MathPanel
+    
+    User->>Canvas: Drag vector tip
+    Canvas->>MathPanel: Update coordinates
+    MathPanel->>MathPanel: Calculate sum, dot product
+    MathPanel-->>Canvas: Display results
+```
+
+### Matrix Operations
+
+- Matrix-vector and matrix-matrix multiplication visualization
+- Step-by-step arithmetic grids showing dot product alignments
+- Visual transpose and property demonstrations
+
+### Linear Transformations
+
+- Apply arbitrary 2x2 matrices to standard shapes
+- Dynamic animations of shear, rotation, scaling, and reflection
+- Real-time coordinate tracking
+
+### Determinants
+
+- Watch unit area scale, flip, or collapse
+- Clear visualization of orientation and singularity conditions
+
+### Vector Spaces
+
+- Explore span, basis, and linear independence concepts
+- Watch span collapse as basis vectors become collinear
+
+### Orthogonality & Gram-Schmidt
+
+- Interactive vector projection
+- Step-by-step orthogonalization animation
+
+### Eigenvalues & Eigenvectors
+
+- Drag test vectors to explore eigenvector behavior
+- Real-time characteristic equation tracing
+
+### SVD Decomposition
+
+- Three-stage visualization of A = U Sigma V^T
+- Interactive representation of rotation, scaling, and second rotation
+
+---
+
+## Design System
+
+LinearVis uses the **Plume Design System** with the following principles:
+
+### Color Palette
+
+```css
+/* Paper / Background */
+--color-paper: oklch(97% 0.010 70);
+
+/* Text & Accents */
+--color-ink: oklch(26% 0.010 50);
+--color-accent: oklch(52% 0.150 195);
+--color-sum: oklch(58% 0.130 300);
+
+/* Semantic Colors */
+--color-emerald: oklch(52% 0.160 155);
+--color-red: oklch(52% 0.160 25);
+```
+
+### Typography
+
+- **Display**: Satoshi / Geist
+- **Body**: Geist / Satoshi
+- **Monospace**: Geist Mono / JetBrains Mono
+
+### Responsive Layout
+
+- Fluid flex panels with adaptive sidebars
+- High-performance ResizeObserver for dynamic sizing
+- KaTeX-powered mathematical typesetting
+
+---
+
+## Getting Started
 
 ### Prerequisites
-Make sure you have [Node.js](https://nodejs.org/) installed (v18+ recommended).
 
-### 1. Clone & Navigate
+- Node.js v18 or higher
+- npm or yarn package manager
+
+### Installation
+
 ```bash
+# Clone the repository
 git clone https://github.com/your-username/LinearVis.git
 cd LinearVis
-```
 
-### 2. Install Dependencies
-```bash
+# Install dependencies
 npm install
-```
 
-### 3. Run Development Server
-```bash
+# Start development server
 npm run dev
 ```
-Open your browser and navigate to the address shown in your console (usually `http://localhost:5173`).
 
-### 4. Build for Production
+### Build for Production
+
 ```bash
 npm run build
 ```
-This produces a highly compressed, minified, and optimized distribution folder (`dist/`) ready for web deployment.
+
+The production build is output to the `dist/` directory as a minified, optimized bundle.
 
 ---
 
-## 🔒 License & Terms of Use
+## State Management Architecture
 
-LinearViz is distributed under a **strictly non-commercial, educational license**:
+```mermaid
+flowchart LR
+    subgraph Store["Zustand Store"]
+        Module[Current Module]
+        Progress[Module Progress]
+        Settings[Theme Settings]
+    end
 
-- **Allowed**:
-  - ✅ Using LinearViz for personal study, academic research, and learning.
-  - ✅ Utilizing it in classrooms, lecture halls, and virtual courses to teach linear algebra.
-  - ✅ Forking, modifying, and hosting personal clones for individual study or classroom demonstrations.
-- **Prohibited**:
-  - ❌ **Commercial Use**: You may not sell, rent, lease, license, or monetize the software, its build artifacts, or its derivative works.
-  - ❌ **Paid Courses**: You may not bundle this code inside paid online courses, books, or subscription-based educational programs.
-  - ❌ **Ad-Monetization**: Hosting the visualizer on an ad-supported domain or charging fees for access is strictly prohibited.
+    subgraph Vectors["Vector Module State"]
+        Vecs[Vector Array]
+        Selected[Selected Vector]
+        SumIds[Sum Selection]
+        Anim[Animation State]
+    end
+
+    Store --> Vectors
+```
+
+The application uses Zustand for global state management, with each module maintaining its own local state for interactive operations.
 
 ---
 
-## 📬 Contributing & Reporting Issues
+## License
 
-Your feedback is highly valued! If you find a bug, encounter a layout mismatch, or have an idea for an interactive module, feel free to get in touch:
+LinearVis is distributed under a non-commercial, educational license:
 
-1. **Check Existing Issues**: Check active issues to see if it's already being addressed.
-2. **Open an Issue**: Clearly describe the bug, document the steps to reproduce it, and attach screenshots or console logs if applicable.
-3. **Submit a Pull Request**: If you are a developer looking to fix layout or math bugs, pull requests matching our design system tokens are welcome.
+**Permitted:**
+- Personal study and academic research
+- Classroom and virtual course demonstrations
+- Forking and modifying for educational purposes
+
+**Prohibited:**
+- Commercial use or monetization
+- Inclusion in paid courses or subscriptions
+- Ad-supported hosting
+
+---
+
+## Contributing
+
+Contributions are welcome. Please ensure any changes align with the design system tokens defined in `src/index.css`.
+
+### Development Workflow
+
+1. Create a feature branch
+2. Make changes with proper ESLint compliance
+3. Test with `npm run dev`
+4. Build to verify production compatibility
+5. Submit a pull request

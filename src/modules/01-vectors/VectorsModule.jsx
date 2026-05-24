@@ -25,9 +25,10 @@ export default function VectorsModule() {
   const [dragging, setDragging] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [editName, setEditName] = useState('');
-  const [activeId1, setActiveId1] = useState(1);
-  const [activeId2, setActiveId2] = useState(2);
   const [sumIds, setSumIds] = useState([1, 2]);
+  const [showSumAnimation, setShowSumAnimation] = useState(false);
+  const [sumAnimationStep, setSumAnimationStep] = useState(0);
+  const [showDotProductViz, setShowDotProductViz] = useState(false);
   const canvasRef = useRef(null);
   const isPanning = useRef(false);
   const lastPos = useRef({ x: 0, y: 0 });
@@ -47,6 +48,22 @@ export default function VectorsModule() {
     ro.observe(canvasRef.current);
     return () => ro.disconnect();
   }, []);
+
+  useEffect(() => {
+    if (!showSumAnimation) {
+      if (sumAnimationStep !== 0) setSumAnimationStep(0);
+      return;
+    }
+    if (sumAnimationStep === 0) {
+      setSumAnimationStep(1);
+      return;
+    }
+    if (sumAnimationStep >= 3) return;
+    const timer = setTimeout(() => setSumAnimationStep(s => s + 1), 1500);
+    return () => clearTimeout(timer);
+  }, [showSumAnimation, sumAnimationStep]);
+
+  const selectedVec = useMemo(() => vectors.find(v => v.id === selectedId) || null, [vectors, selectedId]);
 
   // The scale: how many pixels per world-unit
   const pixelsPerUnit = useMemo(() => {
@@ -75,16 +92,28 @@ export default function VectorsModule() {
   const addVector = () => {
     const id = Date.now();
     const letters = ['c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k'];
-    const colors = [
-      'oklch(52% 0.160 195)',
-      'oklch(52% 0.160 250)',
-      'oklch(62% 0.140 290)',
-      'oklch(65% 0.120 70)',
-      'oklch(52% 0.140 155)',
-      'oklch(58% 0.160 220)',
+    const blockedColors = [
+      'oklch(52% 0.160 25)',   // red (a)
+      'oklch(52% 0.160 155)',  // green (b)
+      'oklch(58% 0.130 300)',  // purple (sum)
+      'oklch(58% 0.120 300)',  // dark purple (sum dark)
     ];
+    const availableColors = [
+      'oklch(52% 0.160 195)',  // blue
+      'oklch(52% 0.160 250)',  // violet
+      'oklch(62% 0.140 290)',  // light violet
+      'oklch(65% 0.120 70)',   // amber
+      'oklch(58% 0.160 220)',  // cyan
+      'oklch(52% 0.140 155)',  // emerald
+      'oklch(70% 0.100 150)',  // light green
+      'oklch(72% 0.130 235)',  // light blue
+    ];
+    const usedColors = vectors.map(v => v.color);
+    const unusedColors = availableColors.filter(c => !usedColors.includes(c));
     const name = letters[vectors.length] || `v${vectors.length + 1}`;
-    const color = colors[vectors.length % colors.length];
+    const color = unusedColors.length > 0 
+      ? unusedColors[0] 
+      : availableColors[vectors.length % availableColors.length];
     setVectors(prev => [...prev, {
       id,
       name,
@@ -118,55 +147,41 @@ export default function VectorsModule() {
       { id: 2, name: 'b', coords: [1, -1], color: 'oklch(52% 0.160 155)' },
     ]);
     setSelectedId(1);
-    setActiveId1(1);
-    setActiveId2(2);
     setSumIds([1, 2]);
     setZoom(1.2);
     setPan({ x: 0, y: 0 });
   };
 
-  // Sync active math vectors when vectors are deleted or modified
+  // Sync sumIds when vectors are deleted
   useEffect(() => {
     if (vectors.length === 0) return;
     
-    // Ensure activeId1 points to an existing vector
-    const hasV1 = vectors.some(v => v.id === activeId1);
-    let nextId1 = activeId1;
-    if (!hasV1) {
-      nextId1 = vectors[0].id;
-      setActiveId1(nextId1);
-    }
-
-    // Ensure activeId2 points to an existing vector
-    const hasV2 = vectors.some(v => v.id === activeId2);
-    if (!hasV2 || activeId2 === nextId1) {
-      const remaining = vectors.filter(v => v.id !== nextId1);
-      if (remaining.length > 0) {
-        setActiveId2(remaining[0].id);
-      } else {
-        setActiveId2(nextId1);
-      }
-    }
-
     // Ensure sumIds only contains existing vectors
     setSumIds(prev => {
       const filtered = prev.filter(id => vectors.some(v => v.id === id));
       if (filtered.length === 0 && vectors.length > 0) {
-        return vectors.slice(0, 2).map(v => v.id);
+        return vectors.slice(0, Math.min(2, vectors.length)).map(v => v.id);
       }
       return filtered;
     });
-  }, [vectors, activeId1, activeId2]);
+  }, [vectors]);
 
-  const v1 = useMemo(() => vectors.find(v => v.id === activeId1) || vectors[0] || null, [vectors, activeId1]);
-  const v2 = useMemo(() => vectors.find(v => v.id === activeId2) || vectors[1] || null, [vectors, activeId2]);
+  const v1 = useMemo(() => {
+    if (sumIds.length === 0) return vectors[0] || null;
+    return vectors.find(v => v.id === sumIds[0]) || vectors[0] || null;
+  }, [vectors, sumIds]);
+  
+  const v2 = useMemo(() => {
+    if (sumIds.length < 2) return vectors[1] || vectors[0] || null;
+    return vectors.find(v => v.id === sumIds[1]) || vectors[1] || v1 || null;
+  }, [vectors, sumIds, v1]);
 
   const activeSumVectors = useMemo(() => vectors.filter(v => sumIds.includes(v.id)), [vectors, sumIds]);
 
   const sumVec = useMemo(() => {
     if (activeSumVectors.length === 0) return null;
     const coords = activeSumVectors.reduce((acc, v) => [acc[0] + v.coords[0], acc[1] + v.coords[1]], [0, 0]);
-    return { name: 'Σ', coords, color: 'var(--color-accent)' };
+    return { name: 'Σ', coords, color: 'var(--color-sum)' };
   }, [activeSumVectors]);
 
   const dotProd = useMemo(() => {
@@ -197,37 +212,43 @@ export default function VectorsModule() {
     },
     {
       title: 'Vector coordinates',
-      concept: 'A vector is written as [x, y] where x is how far right and y is how far up. The vector a = [3, 2] goes 3 steps right and 2 steps up from the origin.',
+      concept: `A vector is written as [x, y] where x is how far right and y is how far up. The vector ${selectedVec?.name || v1?.name || 'a'} = [${selectedVec?.coords[0].toFixed(1) || 0}, ${selectedVec?.coords[1].toFixed(1) || 0}] goes ${Math.abs(selectedVec?.coords[0] || 0).toFixed(0)} steps ${(selectedVec?.coords[0] || 0) >= 0 ? 'right' : 'left'} and ${Math.abs(selectedVec?.coords[1] || 0).toFixed(0)} steps ${(selectedVec?.coords[1] || 0) >= 0 ? 'up' : 'down'} from the origin.`,
       hint: 'Select a vector in the legend overlay to see its coordinates.',
       action: 'Select a vector and read its coordinates',
     },
     {
       title: 'What is magnitude?',
-      concept: `The magnitude |a| = √(3² + 2²) ≈ ${mag1.toFixed(1)} is the length of the arrow — the straight-line distance from the origin to the tip. We use Pythagorean theorem: √(x² + y²).`,
+      concept: `The magnitude |${v1?.name || 'a'}| = √(${v1?.coords[0].toFixed(1) || 0}² + ${v1?.coords[1].toFixed(1) || 0}²) ≈ ${mag1.toFixed(1)} is the length of the arrow — the straight-line distance from the origin to the tip. We use the Pythagorean theorem: √(x² + y²).`,
       hint: 'The sidebar shows |a| = magnitude for the selected vector.',
       action: 'Read the magnitude in the right sidebar',
     },
     {
       title: 'What is vector addition?',
-      concept: `Adding vectors places them tip-to-tail: a + b = [${v1?.coords[0].toFixed(1) || 0} + ${v2?.coords[0].toFixed(1) || 0}, ${v1?.coords[1].toFixed(1) || 0} + ${v2?.coords[1].toFixed(1) || 0}] = [${sumVec?.coords[0].toFixed(1) || 0}, ${sumVec?.coords[1].toFixed(1) || 0}]. The purple arrow (Σ) shows their sum.`,
+      concept: `Adding vectors places them tip-to-tail: ${v1?.name || 'a'} + ${v2?.name || 'b'} = [${v1?.coords[0].toFixed(1) || 0} + ${v2?.coords[0].toFixed(1) || 0}, ${v1?.coords[1].toFixed(1) || 0} + ${v2?.coords[1].toFixed(1) || 0}] = [${sumVec?.coords[0].toFixed(1) || 0}, ${sumVec?.coords[1].toFixed(1) || 0}]. The purple arrow (Σ) shows their sum.`,
       hint: 'The purple Σ arrow is the sum. The dashed parallelogram shows how tip-to-tail addition works geometrically.',
       action: 'Watch how a + b forms the purple sum arrow',
     },
     {
       title: 'What is the dot product?',
-      concept: `a · b = ${v1?.coords[0].toFixed(1) || 0} × ${v2?.coords[0].toFixed(1) || 0} + ${v1?.coords[1].toFixed(1) || 0} × ${v2?.coords[1].toFixed(1) || 0} = ${dotProd.toFixed(2)}. Multiply matching coordinates and add: [x₁×x₂] + [y₁×y₂].`,
+      concept: `${v1?.name || 'a'} · ${v2?.name || 'b'} = ${v1?.coords[0].toFixed(1) || 0} × ${v2?.coords[0].toFixed(1) || 0} + ${v1?.coords[1].toFixed(1) || 0} × ${v2?.coords[1].toFixed(1) || 0} = ${dotProd.toFixed(2)}. Multiply matching coordinates and add: [x₁×x₂] + [y₁×y₂].`,
       hint: 'The sidebar shows the full dot product calculation with the component breakdown.',
       action: 'Find the dot product calculation in the right sidebar',
     },
     {
       title: 'What does the dot product tell us?',
-      concept: `a · b = |a| × |b| × cos(θ) = ${mag1.toFixed(1)} × ${mag2.toFixed(1)} × cos(${angle.toFixed(0)}°) = ${dotProd.toFixed(2)}. A positive dot product means an acute angle (<90°); negative means obtuse (>90°); zero means perpendicular.`,
+      concept: `${v1?.name || 'a'} · ${v2?.name || 'b'} = |${v1?.name || 'a'}| × |${v2?.name || 'b'}| × cos(θ) = ${mag1.toFixed(1)} × ${mag2.toFixed(1)} × cos(${angle.toFixed(0)}°) = ${dotProd.toFixed(2)}. The dot product measures how much the vectors point in the SAME direction.`,
       hint: 'Drag a vector to see the angle change. Watch the dot product sign change.',
       action: 'Drag vectors to see angle affect dot product sign',
     },
     {
+      title: 'Angle interpretation',
+      concept: `• Positive: acute angle (<90°) — similar direction\n• Zero: perpendicular (90°) — no overlap\n• Negative: obtuse (>90°) — opposite directions\n• Geometrically: projection of one vector onto another multiplied by the other's length.`,
+      hint: 'Watch the indicator in the right panel change as you move vectors.',
+      action: 'Check the dot product indicator in the sidebar',
+    },
+    {
       title: 'Explore freely',
-      concept: 'Add more vectors, rename them, delete them. Try creating three vectors and watching how they sum together. Experiment!',
+      concept: `You have ${vectors.length} vector${vectors.length > 1 ? 's' : ''}: ${vectors.map(v => `${v.name}=[${v.coords[0]},${v.coords[1]}]`).join(', ')}. Add more, rename them, or watch how they sum together. Experiment!`,
       hint: 'Click + to add a vector, or click a vector name to select and rename it.',
       action: 'Add a third vector with the + button',
     },
@@ -339,6 +360,68 @@ export default function VectorsModule() {
     );
   };
 
+  const renderSumAnimation = () => {
+    if (!showSumAnimation || activeSumVectors.length < 2 || !v1 || !v2) return null;
+    
+    const origin = toCanvas(0, 0);
+    const v1Tip = toCanvas(v1.coords[0], v1.coords[1]);
+    const v1AtV2 = toCanvas(v1.coords[0] + v2.coords[0], v1.coords[1] + v2.coords[1]);
+    const ghostStart = v1Tip;
+    const ghostEnd = v1AtV2;
+    const sumTip = toCanvas(sumVec.coords[0], sumVec.coords[1]);
+
+    const v1MidX = (origin.x + v1Tip.x) / 2;
+    const v1MidY = (origin.y + v1Tip.y) / 2;
+    const v2MidX = (ghostStart.x + ghostEnd.x) / 2;
+    const v2MidY = (ghostStart.y + ghostEnd.y) / 2;
+    const sumMidX = (origin.x + sumTip.x) / 2;
+    const sumMidY = (origin.y + sumTip.y) / 2;
+
+    const getLabelOffset = (dirX, dirY) => {
+      if (Math.abs(dirY) > Math.abs(dirX)) {
+        return dirY > 0 ? { x: 12, y: 0, anchor: 'start' } : { x: -12, y: 0, anchor: 'end' };
+      }
+      return dirX > 0 ? { x: 0, y: -25, anchor: 'middle' } : { x: 0, y: 25, anchor: 'middle' };
+    };
+
+    const v2Offset = getLabelOffset(v2.coords[0], v2.coords[1]);
+    const sumOffset = getLabelOffset(sumVec.coords[0], sumVec.coords[1]);
+
+    return (
+      <g>
+        {sumAnimationStep >= 0 && (
+          <line x1={origin.x} y1={origin.y} x2={v1Tip.x} y2={v1Tip.y}
+            stroke={v1.color} strokeWidth="4" strokeLinecap="round" />
+        )}
+
+        {sumAnimationStep >= 1 && (
+          <g>
+            <line x1={ghostStart.x} y1={ghostStart.y} x2={ghostEnd.x} y2={ghostEnd.y}
+              stroke={v2.color} strokeWidth="3" strokeLinecap="round" strokeDasharray="6 4" />
+            <polygon points={`${ghostEnd.x},${ghostEnd.y} ${ghostEnd.x - 12},${ghostEnd.y + 6} ${ghostEnd.x - 12},${ghostEnd.y - 6}`}
+              fill={v2.color} />
+            <rect x={v2MidX + v2Offset.x - 28} y={v2MidY + v2Offset.y - 16} width="56" height="32" rx="6"
+              fill="var(--color-paper)" stroke={v2.color} strokeWidth="1.5" />
+            <text x={v2MidX + v2Offset.x} y={v2MidY + v2Offset.y}
+              fontSize="12" fontWeight="700" fontFamily="var(--font-mono)"
+              textAnchor={v2Offset.anchor} fill={v2.color}>{v2.name}</text>
+          </g>
+        )}
+
+        {sumAnimationStep >= 2 && (
+          <g>
+            {renderArrow(origin, sumTip, 'var(--color-sum)', 5)}
+            <rect x={sumMidX + sumOffset.x - 38} y={sumMidY + sumOffset.y - 16} width="76" height="32" rx="6"
+              fill="var(--color-paper)" stroke="var(--color-sum)" strokeWidth="1.5" />
+            <text x={sumMidX + sumOffset.x} y={sumMidY + sumOffset.y}
+              fontSize="11" fontWeight="700" fontFamily="var(--font-mono)"
+              textAnchor="middle" fill="var(--color-sum)">{v1.name} + {v2.name}</text>
+          </g>
+        )}
+      </g>
+    );
+  };
+
   const renderAngleArc = () => {
     if (!v1 || !v2 || !showAngle || v1.id === v2.id) return null;
     const a1 = Math.atan2(v1.coords[1], v1.coords[0]);
@@ -399,8 +482,8 @@ export default function VectorsModule() {
     return (
       <g>
         <polygon points={`${o.x},${o.y} ${a.x},${a.y} ${s.x},${s.y} ${b.x},${b.y}`}
-          fill="var(--color-accent)" fillOpacity="0.08"
-          stroke="var(--color-accent)" strokeWidth="1.5" strokeDasharray="6 3" strokeOpacity="0.4" />
+          fill="var(--color-sum)" fillOpacity="0.08"
+          stroke="var(--color-sum)" strokeWidth="1.5" strokeDasharray="6 3" strokeOpacity="0.4" />
         <text x={cx} y={cy} fill="oklch(65% 0.100 70)" fontSize="10" fontWeight="700"
           fontFamily="var(--font-mono)" textAnchor="middle" dominantBaseline="middle"
           opacity="0.7">
@@ -483,8 +566,6 @@ export default function VectorsModule() {
       </g>
     );
   };
-
-  const selectedVec = vectors.find(v => v.id === selectedId);
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
@@ -605,6 +686,26 @@ export default function VectorsModule() {
           >
             {showAngle ? '✓ ' : ''}Angle
           </button>
+
+          <button onClick={() => {
+              if (showSumAnimation) {
+                setShowSum(true);
+                setShowAngle(true);
+                setShowSumAnimation(false);
+              } else {
+                setShowSum(false);
+                setShowAngle(false);
+                setShowSumAnimation(true);
+              }
+            }}
+            className="px-3 py-1 text-xs font-semibold rounded-lg transition-all duration-150 border"
+            style={showSumAnimation
+              ? { backgroundColor: 'var(--color-sum)', color: 'var(--color-paper)', borderColor: 'var(--color-sum)' }
+              : { backgroundColor: 'var(--color-paper)', color: 'var(--color-ink-2)', borderColor: 'var(--color-rule)' }
+            }
+          >
+            {showSumAnimation ? '✓ ' : ''}Sum Anim
+          </button>
         </div>
 
         <button onClick={resetAll}
@@ -661,8 +762,8 @@ export default function VectorsModule() {
                   {steps[currentStep].title}
                 </h3>
                 <p
-                  className="text-xs leading-relaxed line-clamp-2"
-                  style={{ color: 'var(--color-muted)' }}
+                  className="text-xs leading-relaxed"
+                  style={{ color: 'var(--color-muted)', whiteSpace: 'pre-line' }}
                 >
                   {steps[currentStep].concept}
                 </p>
@@ -798,6 +899,8 @@ export default function VectorsModule() {
                 );
               })()}
               {renderAngleArc()}
+
+              {renderSumAnimation()}
             </svg>
 
             {/* ── Vector Legend Overlay ── */}
@@ -838,19 +941,23 @@ export default function VectorsModule() {
               <div className="px-2 py-1.5 space-y-0.5" style={{ maxHeight: '200px', overflowY: 'auto' }}>
                 {vectors.map(vec => {
                   const isSelected = selectedId === vec.id;
+                  const isInSum = sumIds.includes(vec.id);
                   return (
                     <div
                       key={vec.id}
                       onClick={() => setSelectedId(vec.id)}
                       className="flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer transition-all duration-100"
                       style={{
-                        backgroundColor: isSelected ? 'rgba(75,160,195,0.12)' : 'transparent',
+                        backgroundColor: isSelected ? 'rgba(75,160,195,0.15)' : isInSum ? 'rgba(88,0,150,0.08)' : 'transparent',
+                        borderWidth: isInSum ? '1.5px' : '0',
+                        borderStyle: 'solid',
+                        borderColor: isInSum ? 'var(--color-sum)' : 'transparent',
                       }}
                       onMouseEnter={e => {
-                        if (!isSelected) e.currentTarget.style.backgroundColor = 'var(--color-paper-2)';
+                        if (!isSelected && !isInSum) e.currentTarget.style.backgroundColor = 'var(--color-paper-2)';
                       }}
                       onMouseLeave={e => {
-                        if (!isSelected) e.currentTarget.style.backgroundColor = 'transparent';
+                        if (!isSelected && !isInSum) e.currentTarget.style.backgroundColor = 'transparent';
                       }}
                     >
                       {/* Checkbox for sum inclusion */}
@@ -900,9 +1007,9 @@ export default function VectorsModule() {
                 {/* Sum entry */}
                 {showSum && sumVec && vectors.length >= 2 && (
                   <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg border-t mt-1 pt-1.5"
-                    style={{ borderColor: 'var(--color-rule)' }}>
-                    <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: 'var(--color-accent)' }} />
-                    <span className="text-xs font-bold flex-shrink-0" style={{ color: 'var(--color-accent)', fontFamily: 'var(--font-mono)' }}>
+                    style={{ borderColor: 'var(--color-sum)' }}>
+                    <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: 'var(--color-sum)' }} />
+                    <span className="text-xs font-bold flex-shrink-0" style={{ color: 'var(--color-sum)', fontFamily: 'var(--font-mono)' }}>
                       Σ
                     </span>
                     <span className="text-xs flex-1" style={{ color: 'var(--color-muted)', fontFamily: 'var(--font-mono)' }}>
@@ -923,75 +1030,6 @@ export default function VectorsModule() {
             }}
           >
             <div className="p-3 space-y-3">
-
-              {/* Target Vector Selector */}
-              {vectors.length >= 2 && (
-                <div
-                  className="p-3 rounded-xl border transition-all duration-150"
-                  style={{
-                    backgroundColor: 'var(--color-paper-2)',
-                    borderColor: 'var(--color-rule)',
-                  }}
-                >
-                  <div className="font-semibold mb-2.5 text-xs" style={{ color: 'var(--color-neutral)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
-                    Math Target Vectors
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div>
-                      <label className="block mb-1 font-medium" style={{ color: 'var(--color-muted)' }}>First Vector</label>
-                      <select
-                        value={activeId1}
-                        onChange={(e) => {
-                          const val = Number(e.target.value);
-                          if (val === activeId2 && vectors.length > 1) {
-                            setActiveId2(activeId1);
-                          }
-                          setActiveId1(val);
-                        }}
-                        className="w-full px-2 py-1.5 rounded-lg border outline-none font-semibold cursor-pointer transition-all focus:border-accent"
-                        style={{
-                          backgroundColor: 'var(--color-paper)',
-                          borderColor: 'var(--color-rule)',
-                          color: 'var(--color-ink)',
-                          fontFamily: 'var(--font-mono)',
-                        }}
-                      >
-                        {vectors.map(v => (
-                          <option key={v.id} value={v.id} style={{ color: v.color }}>
-                            {v.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block mb-1 font-medium" style={{ color: 'var(--color-muted)' }}>Second Vector</label>
-                      <select
-                        value={activeId2}
-                        onChange={(e) => {
-                          const val = Number(e.target.value);
-                          if (val === activeId1 && vectors.length > 1) {
-                            setActiveId1(activeId2);
-                          }
-                          setActiveId2(val);
-                        }}
-                        className="w-full px-2 py-1.5 rounded-lg border outline-none font-semibold cursor-pointer transition-all focus:border-accent"
-                        style={{
-                          backgroundColor: 'var(--color-paper)',
-                          borderColor: 'var(--color-rule)',
-                          color: 'var(--color-ink)',
-                          fontFamily: 'var(--font-mono)',
-                        }}
-                      >
-                        {vectors.map(v => (
-                          <option key={v.id} value={v.id} style={{ color: v.color }}>
-                            {v.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                </div>
-              )}
 
               {/* Selected Vector Details */}
               {selectedVec && (
@@ -1173,6 +1211,50 @@ export default function VectorsModule() {
                     ) : (
                       <div className="text-xs p-1.5 rounded-lg" style={{ backgroundColor: 'rgba(75,180,140,0.12)', color: 'oklch(52% 0.08 155)' }}>
                         ↑ Acute angle (&lt;90°) — similar direction
+                      </div>
+                    )}
+                    <button
+                      onClick={() => setShowDotProductViz(!showDotProductViz)}
+                      className="w-full mt-2 px-3 py-2 text-xs rounded-lg border transition-all"
+                      style={{
+                        backgroundColor: showDotProductViz ? 'var(--color-paper)' : 'transparent',
+                        borderColor: 'var(--color-rule)',
+                        color: 'var(--color-muted)',
+                      }}
+                    >
+                      {showDotProductViz ? '▼ Hide geometric meaning' : '▶ Show geometric meaning'}
+                    </button>
+                    {showDotProductViz && v1 && v2 && (
+                      <div className="mt-2 p-3 rounded-lg border" style={{ backgroundColor: 'var(--color-paper)', borderColor: 'var(--color-rule)' }}>
+                        <div className="text-xs font-semibold mb-2" style={{ color: 'var(--color-ink)' }}>
+                          What does the dot product mean?
+                        </div>
+                        <div className="space-y-2 text-xs" style={{ color: 'var(--color-muted)' }}>
+                          <div className="p-2 rounded" style={{ backgroundColor: 'var(--color-paper-2)' }}>
+                            <div className="font-semibold mb-1" style={{ color: v1.color }}>{v1.name}</div>
+                            <div>Vector: [{v1.coords[0].toFixed(1)}, {v1.coords[1].toFixed(1)}]</div>
+                            <div>|{v1.name}| = {mag1.toFixed(2)} (length)</div>
+                          </div>
+                          <div className="p-2 rounded" style={{ backgroundColor: 'var(--color-paper-2)' }}>
+                            <div className="font-semibold mb-1" style={{ color: v2.color }}>{v2.name}</div>
+                            <div>|{v2.name}| = {mag2.toFixed(2)} (length)</div>
+                            <div>|{v1.name}|cos(θ) = projection of {v1.name} onto {v2.name}</div>
+                          </div>
+                          <div className="p-2 rounded border" style={{ borderColor: 'var(--color-sum)', backgroundColor: 'rgba(88,0,150,0.05)' }}>
+                            <div className="font-semibold mb-1" style={{ color: 'var(--color-sum)' }}>Geometric Formula</div>
+                            <div>{v1.name} · {v2.name} = |{v1.name}| × |{v2.name}| × cos(θ)</div>
+                            <div>= {mag1.toFixed(2)} × {mag2.toFixed(2)} × cos({angle.toFixed(0)}°)</div>
+                            <div className="font-semibold mt-1" style={{ color: 'var(--color-sum)' }}>
+                              = {dotProd.toFixed(3)}
+                            </div>
+                          </div>
+                          <div className="p-2 rounded" style={{ backgroundColor: 'var(--color-paper-2)' }}>
+                            <div className="font-semibold mb-1">Interpretation</div>
+                            <div>The dot product = <strong>how much {v1.name} overlaps with {v2.name}</strong></div>
+                            <div>If you project {v1.name} onto {v2.name}, the length is |{v1.name}|cos(θ)</div>
+                            <div>Multiplying by |{v2.name}| gives the total overlap</div>
+                          </div>
+                        </div>
                       </div>
                     )}
                   </div>
