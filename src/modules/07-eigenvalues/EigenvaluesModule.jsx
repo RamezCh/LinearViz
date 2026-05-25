@@ -14,33 +14,70 @@ function applyTransformation(v, A) {
 const steps = [
   {
     title: 'What are Eigenvalues?',
-    concept: 'An eigenvalue λ means that when we apply matrix A to eigenvector v, we just scale it: Av = λv. The direction doesn\'t change — only the length!',
-    hint: 'Look for amber vectors — they stay on their lines after transformation.',
-    action: 'Find the eigenvector lines on the canvas',
+    concept: `An EIGENVALUE λ and its EIGENVECTOR v have a special relationship:
+  A × v = λ × v
+
+Translation: When matrix A transforms eigenvector v, the result stays in the SAME DIRECTION as v — it only stretches or squishes!
+
+Example: If v = [1, 0] is an eigenvector with λ = 2, then A×[1,0] = 2×[1,0] = [2, 0]
+
+The eigenvector doesn't change direction — just length!`,
+    hint: 'The AMBER lines show eigenvector directions. Vectors ON these lines stay on them after transformation.',
+    action: 'Find the amber eigenvector lines on the canvas',
   },
   {
     title: 'The Characteristic Equation',
-    concept: 'To find eigenvalues, solve det(A - λI) = 0. This gives us a quadratic equation in λ.',
-    hint: 'The sidebar shows the step-by-step derivation.',
-    action: 'Click "Compute Eigenvalues" to see derivation',
+    concept: `How do we FIND eigenvalues?
+
+Step 1: Start with A × v = λ × v
+Step 2: Rearrange to (A - λI) × v = 0
+Step 3: For non-zero v, we need det(A - λI) = 0
+
+This is the CHARACTERISTIC EQUATION — solve for λ!
+
+For 2×2: det(A - λI) = 0 gives a quadratic in λ`,
+    hint: 'Click "Compute Eigenvalues" button to see step-by-step.',
+    action: 'Click the Compute button to see derivation',
   },
   {
-    title: 'Trace and Determinant',
-    concept: 'For a 2×2 matrix, λ₁ + λ₂ = trace (sum of diagonal) and λ₁ × λ₂ = det. These relationships help us understand the transformation!',
-    hint: 'The Matrix Info panel shows tr(A) and det(A).',
-    action: 'Check the Matrix Info panel',
+    title: 'Trace and Determinant Relationship',
+    concept: `For 2×2 matrices, eigenvalues have special properties:
+• λ₁ + λ₂ = TRACE(A) = a + d (sum of diagonal)
+• λ₁ × λ₂ = DET(A)
+
+These shortcuts let you CHECK your answers!
+
+For your matrix:
+  tr(A) = ${trace.toFixed(2)}
+  det(A) = ${determinant.toFixed(2)}`,
+    hint: 'The right panel shows tr(A) = ' + trace.toFixed(2) + ' and det(A) = ' + determinant.toFixed(2) + '.',
+    action: 'Check the Matrix Info panel for trace and det',
   },
   {
-    title: 'Eigenvalue Interpretation',
-    concept: `λ = ${eigenvalues2x2([[2, 1], [1, 2]])?.map(e => e.value.toFixed(2)).join(', ') || 'N/A'}: Each eigenvalue tells us how much that eigenvector direction stretches or squishes.`,
-    hint: 'Drag the sample vectors and watch eigenvectors stay on their lines.',
-    action: 'Watch how eigenvectors transform',
+    title: 'What Do Eigenvalues Tell Us?',
+    concept: `Your eigenvalues: λ₁ = ${eigenvalues?.[0]?.value?.toFixed(2) || '?'}, λ₂ = ${eigenvalues?.[1]?.value?.toFixed(2) || '?'}
+
+• |λ| > 1: Stretches in that direction
+• |λ| < 1: Squishes in that direction
+• λ < 0: Includes a flip (reflection)
+• λ = 1 or -1: Just rotates or reflects
+
+The AMBER vectors show the eigenvector directions on the canvas!`,
+    hint: 'Drag vectors on the amber lines — they stay on their lines after transformation.',
+    action: 'Drag vectors on eigenvector lines to see the invariance',
   },
   {
     title: 'Complex Eigenvalues',
-    concept: 'If the discriminant (tr² - 4det) is negative, we get complex eigenvalues. This means the transformation includes rotation without a stable eigenvector!',
-    hint: 'Try a rotation matrix like [0, -1; 1, 0] to see complex eigenvalues.',
-    action: 'Try setting matrix to rotation [0, -1, 1, 0]',
+    concept: `If discriminant (tr² - 4×det) < 0, we get COMPLEX eigenvalues.
+
+This means the transformation includes ROTATION — no real eigenvector lines exist!
+
+Example: Rotation by 90° ([0, -1; 1, 0])
+• Every vector rotates!
+• No vector stays on its line
+• Eigenvalues = i and -i (complex!)`,
+    hint: 'Try a rotation matrix: a=0, b=-1, c=1, d=0 → complex eigenvalues.',
+    action: 'Try rotation matrix [0, -1, 1, 0]',
   },
 ];
 

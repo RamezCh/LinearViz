@@ -17,28 +17,59 @@ const COLORS = {
 
 const steps = [
   {
-    title: 'Projection as Shadow',
-    concept: 'The projection of b onto W is like casting a shadow. The shadow (projection) lies entirely within subspace W. We calculate it using: proj_W(b) = (b·u / u·u) × u',
-    hint: 'Drag the blue vector b to see how its projection changes.',
-    action: 'Drag vector b to see projection update',
+    title: 'What is a Subspace W?',
+    concept: `A SUBSPACE W is a line through the origin (0,0) in R².
+
+Think of W as a "one-dimensional world" inside the 2D plane — a line that contains ALL multiples of itself.
+
+Example: If W has direction [1, 0.5], then W contains:
+  [1, 0.5], [2, 1], [-1, -0.5], [0, 0], ... (all multiples!)
+
+Why care? Projecting onto W means finding the "shadow" of a vector onto that line.`,
+    hint: 'The PURPLE subspace W is shown as a line through the origin. Drag its direction!',
+    action: 'Find the purple subspace W line on the canvas',
   },
   {
-    title: 'Orthogonal Complement',
-    concept: 'The component perpendicular to W is called the orthogonal complement. Together, proj and this component perfectly reconstruct b: b = proj(b) + (b - proj(b))',
-    hint: 'Watch the perpendicular component appear. Notice the right angle.',
-    action: 'Check the right angle indicator',
+    title: 'Projection = Casting a Shadow',
+    concept: `The projection of b onto W is the shadow cast by b onto the subspace W.
+
+Imagine the sun directly overhead — the shadow falls straight down onto the line W.
+
+Formula: proj_W(b) = (b·u / u·u) × u
+  • u = direction of subspace W = [${subspaceW[0].toFixed(1)}, ${subspaceW[1].toFixed(1)}]
+  • b = your vector = [${vectorB[0].toFixed(1)}, ${vectorB[1].toFixed(1)}]
+  • The result is the GREEN vector (the shadow on W)`,
+    hint: 'The GREEN vector is b projected onto W. Drag b to change!',
+    action: 'Drag the blue vector b and watch the green projection',
   },
   {
-    title: 'Gram-Schmidt Process',
-    concept: 'Any set of vectors can be made orthogonal using Gram-Schmidt. Each new vector subtracts its projections onto previous ones.',
-    hint: 'Use the Gram-Schmidt stepper to see the process unfold.',
-    action: 'Step through Gram-Schmidt process',
+    title: 'Orthogonal Complement = The Gap',
+    concept: `Every vector can be split into two parts:
+  b = proj_W(b) + perp_W(b)
+
+Where:
+  • proj_W(b) = shadow on W (the green part)
+  • perp_W(b) = the AMBER part, perpendicular to W
+
+The AMBER vector is the "gap" — it's what you'd need to add to the shadow to get back to b!
+
+Notice: proj and perp always form a RIGHT ANGLE.`,
+    hint: 'The AMBER perpendicular component shows the gap. Notice the right angle!',
+    action: 'Watch the amber perpendicular component appear',
   },
   {
-    title: 'Least Squares',
-    concept: 'Least squares finds the best-fit line by projecting data points onto the column space. The line minimizes the perpendicular distance.',
-    hint: 'Drag the line to minimize the sum of squared residuals.',
-    action: 'Try the Least Squares tab',
+    title: 'Gram-Schmidt: Making Orthogonal Vectors',
+    concept: `GRAM-SCHMIDT transforms any set of vectors into an ORTHOGONAL set (all perpendicular to each other).
+
+How it works:
+1. Keep the first vector as-is: e₁ = u₁
+2. For the second: subtract its projection onto e₁
+   v₂ = u₂ - (u₂·e₁)e₁
+3. Now e₁ and v₂ are perpendicular!
+
+Why useful? Orthogonal vectors are independent and easy to work with.`,
+    hint: 'Use the Gram-Schmidt stepper to see each transformation step.',
+    action: 'Step through Gram-Schmidt: watch u₂ get orthogonalized',
   },
 ];
 

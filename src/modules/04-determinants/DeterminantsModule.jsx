@@ -106,11 +106,40 @@ export default function DeterminantsModule() {
       hint: 'The diagonal products minus the off-diagonal products.',
       action: 'Look at the formula panel for details',
     },
+{
+      title: 'When det = 0: Linear Dependence',
+      concept: `If det = 0, the vectors are parallel and lie on the same line. This is called "LINEAR DEPENDENCE."
+
+What does this mean?
+• Two vectors are linearly dependent if one can be made by scaling the other
+• If u = 2×v or v = 0.5×u, they're dependent
+• Geometrically: they point in the same (or exactly opposite) direction
+
+Why care?
+• The area collapses to zero!
+• You can't "span" a 2D space with only 1 direction
+• The matrix becomes non-invertible (no inverse exists)`,
+      hint: 'Drag vectors to be parallel. The area becomes zero!',
+      action: 'Make the vectors parallel (same or opposite direction)',
+    },
     {
-      title: 'When det = 0',
-      concept: 'If the determinant is zero, the vectors are parallel and lie on the same line. The area collapses to zero — they are linearly dependent!',
-      hint: 'Drag one vector to be parallel to the other.',
-      action: 'Make vectors parallel and see det → 0',
+      title: 'Sign Matters: Orientation',
+      concept: isPositive
+        ? `Your vectors form a PARALLELOGRAM with det = ${determinant.toFixed(2)} > 0
+
+What does this mean?
+• The parallelogram is counterclockwise (right-handed)
+• Imagine your right hand: thumb = u, index = v
+• If your palm faces you, it's right-handed
+• det > 0 means the orientation is PRESERVED (no flip)`
+        : `Your vectors form a PARALLELOGRAM with det = ${determinant.toFixed(2)} < 0
+
+What does this mean?
+• The parallelogram is clockwise (left-handed)
+• det < 0 means the orientation is FLIPPED
+• Like a mirror reflection!`,
+      hint: 'Try negative vectors or swap u and v!',
+      action: 'Check the parallelogram orientation and hand-ness',
     },
     {
       title: 'Sign Matters',

@@ -81,15 +81,30 @@ export default function SystemsModule() {
       action: 'Check the solution type badge',
     },
     {
-      title: 'Row Reduction Preview',
-      concept: 'Gaussian elimination solves systems by eliminating variables row by row. The augmented matrix [A|b] captures the system.',
-      hint: 'Look at the augmented matrix in the right panel.',
-      action: 'View the augmented matrix format',
+      title: 'What is Gaussian Elimination?',
+      concept: `Gaussian elimination is a step-by-step process to solve systems:
+1. Write equations as an augmented matrix [A|b]
+2. Use row operations to make the left side upper-triangular
+3. Back-substitute to find the solution
+
+It's like solving a puzzle: make the matrix simpler until the answer is obvious!
+
+Your system:
+  ${equation1.a}x + ${equation1.b}y = ${equation1.c}
+  ${equation2.a}x + ${equation2.b}y = ${equation2.c}`,
+      hint: 'The augmented matrix [A|b] has the coefficients on the left and constants on the right.',
+      action: 'Look at the augmented matrix structure',
     },
     {
       title: 'The Matrix View',
-      concept: 'The system Ax = b can be solved using A⁻¹b when det(A) ≠ 0. The matrix captures the entire system!',
-      hint: 'The matrix view shows the same system in compact form.',
+      concept: `The system Ax = b compactly represents the equations:
+
+  A = [${equation1.a}, ${equation1.b}]     b = [${equation1.c}]
+      [${equation2.a}, ${equation2.b}]         [${equation2.c}]
+
+To solve: x = A⁻¹b  (when det(A) ≠ 0)
+Or use Gaussian elimination!`,
+      hint: 'The matrix view shows the same system in compact form. det(A) = ${(equation1.a * equation2.b - equation2.a * equation1.b).toFixed(2)}.',
       action: 'Compare equation and matrix views',
     },
   ];

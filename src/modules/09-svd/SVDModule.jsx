@@ -11,28 +11,62 @@ const ACCENT_RGB = '75,160,195';
 
 const steps = [
   {
-    title: 'Every Matrix is Three Operations',
-    concept: 'SVD reveals that ANY matrix A can be decomposed into three sequential transformations: A = U × Σ × Vᵀ. First, Vᵀ rotates to align the input basis.',
-    hint: 'Look at the 3D visualization — Vᵀ rotates first, then Σ stretches.',
-    action: 'Observe the Vᵀ rotation step',
+    title: 'Every Matrix = 3 Simple Steps',
+    concept: `SVD reveals that ANY matrix A can be broken into 3 simple operations:
+  A = U × Σ × Vᵀ
+
+What does each do?
+• Vᵀ (right): ROTATES the input to align with key directions
+• Σ (middle): STRETCHES/ compresses along those directions
+• U (left): ROTATES back to the original frame
+
+Visualize it: The 3D sphere shows how the unit circle transforms through these steps.`,
+    hint: 'The 3D visualization shows the unit circle (blue) and its transformed version.',
+    action: 'Rotate the 3D view to see how the circle transforms',
   },
   {
-    title: 'Singular Values as Stretch Amounts',
-    concept: 'The diagonal entries σ₁ ≥ σ₂ ≥ ... of Σ tell us exactly how much stretching happens at each step. The bars show their relative magnitudes.',
-    hint: 'The bar chart shows the singular values for compression.',
+    title: 'What are Singular Values?',
+    concept: `The SIGMA (Σ) matrix contains the SINGULAR VALUES: σ₁, σ₂, ...
+
+These are STRETCH FACTORS — how much the matrix stretches in each direction.
+
+In your 2×2 matrix:
+• σ₁ = ${svdMatrix.S[0]?.toFixed(2) || '?'} (largest stretch)
+• σ₂ = ${svdMatrix.S[1]?.toFixed(2) || '?'} (smallest stretch)
+
+Think of it like squeezing a balloon: σ₁ and σ₂ tell you how much it stretches in each direction!`,
+    hint: 'The bar chart shows σ values. Larger bar = more stretching.',
     action: 'Check the singular value chart',
   },
   {
-    title: 'Rank-k Approximation',
-    concept: 'Keeping only the top k singular values gives the best rank-k approximation. The error decreases as k increases — fewer values needed for good accuracy!',
-    hint: 'Drag the rank slider to see how image quality changes.',
-    action: 'Adjust the rank k slider',
+    title: 'Rank-k Approximation = Compression',
+    concept: `RANK is how many "independent directions" a matrix has.
+
+Rank-1 approximation: Use only σ₁ × u₁ × v₁ᵀ (1 direction)
+Rank-2 approximation: Use σ₁u₁v₁ᵀ + σ₂u₂v₂ᵀ (all directions)
+
+The APPROXIMATION ERROR is:
+  ||A - A_k|| = σ_{k+1} (the first dropped singular value)
+
+More ranks kept = smaller error = better approximation!`,
+    hint: 'Drag the rank slider to see image quality vs compression.',
+    action: 'Adjust the rank k slider and watch the quality',
   },
   {
     title: 'Connection to PCA',
-    concept: 'SVD and PCA are deeply connected! PCA finds directions of maximum variance — these are exactly the columns of U (left singular vectors).',
-    hint: 'U columns are the principal directions of the data.',
-    action: 'Learn about PCA connection',
+    concept: `SVD and PCA (Principal Component Analysis) are the SAME THING!
+
+PCA finds directions of MAXIMUM VARIANCE in data
+SVD finds the LEFT SINGULAR VECTORS (columns of U)
+
+These are identical! U's columns = principal components.
+
+Use PCA/SVD to:
+• Reduce dimensions (keep top k components)
+• Find patterns in data
+• Compress images (rank-k approximation)`,
+    hint: 'U columns = directions of most variance = principal components.',
+    action: 'See how U columns relate to data directions',
   },
 ];
 

@@ -11,7 +11,7 @@ const VECTOR_COLORS = {
   v1: 'oklch(50% 0.12 235)',
   v2: 'oklch(52% 0.16 155)',
   v3: 'oklch(65% 0.10 70)',
-  result: 'oklch(52% 0.16 155)',
+  result: 'oklch(58% 0.130 300)',  // purple - distinct from v2
 };
 
 const useVectorSpacesStore = create((set) => ({
@@ -37,9 +37,21 @@ const useVectorSpacesStore = create((set) => ({
 const steps = [
   {
     title: 'What is a Linear Combination?',
-    concept: 'A linear combination of vectors v₁ and v₂ is a sum of scalar multiples: c₁v₁ + c₂v₂. Drag the sliders to see how c₁ and c₂ affect the result.',
-    hint: 'Use the sliders below the canvas to change c₁ and c₂ values.',
-    action: 'Adjust the scalar sliders',
+    concept: `A LINEAR COMBINATION of vectors v₁ and v₂ means:
+  c₁ × v₁ + c₂ × v₂
+
+Where c₁ and c₂ are scalar numbers (like 1, 2, -0.5).
+
+Example with your vectors:
+  v₁ = [${vectors.v1[0]}, ${vectors.v1[1]}]
+  v₂ = [${vectors.v2[0]}, ${vectors.v2[1]}]
+  
+  If c₁ = ${c1}, c₂ = ${c2}:
+  Result = ${c1}×v₁ + ${c2}×v₂ = [${(c1 * vectors.v1[0] + c2 * vectors.v2[0]).toFixed(1)}, ${(c1 * vectors.v1[1] + c2 * vectors.v2[1]).toFixed(1)}]
+
+The PURPLE arrow shows the result (c₁v₁ + c₂v₂).`,
+    hint: 'Use the sliders to change c₁ and c₂ values. Watch the purple result vector change!',
+    action: 'Adjust the scalar sliders and watch the purple result',
   },
   {
     title: 'Span of Vectors',
