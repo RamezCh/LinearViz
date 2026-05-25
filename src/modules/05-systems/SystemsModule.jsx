@@ -1,23 +1,23 @@
 import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { AlertCircle, Infinity, Check, Gamepad2 } from 'lucide-react';
-import Grid2D from '../../components/Canvas/Grid2D';
-import Button from '../../components/UI/Button';
-import Card from '../../components/UI/Card';
-import { FormulaRenderer } from '../../components/FormulaPanel/FormulaRenderer';
+import { Button } from '../../components/UI/Button';
 import { useStore } from '../../store/useStore';
 import CompletionToggle from '../../components/UI/CompletionToggle';
 import GameWrapper from '../../components/MiniGame/GameWrapper';
 import SolveTheSystem from '../../games/SolveTheSystem';
 
+const GRID_EXTENT = 6;
+const COLORS = ['oklch(50% 0.12 235)', 'oklch(52% 0.16 155)', 'oklch(65% 0.10 70)'];
+
 export default function SystemsModule() {
-  const { isGuidedMode, guidedStep, setGuidedStep } = useStore();
   const [numEquations, setNumEquations] = useState(2);
   const [equation1, setEquation1] = useState({ a: 1, b: -1, c: 2 });
   const [equation2, setEquation2] = useState({ a: 2, b: 1, c: 4 });
   const [equation3, setEquation3] = useState({ a: 1, b: 2, c: 3 });
-  const [reductionStep, setReductionStep] = useState(0);
+  const [currentStep, setCurrentStep] = useState(0);
   const [showGame, setShowGame] = useState(false);
+  const [reductionStep, setReductionStep] = useState(0);
 
   const equations = [equation1, equation2, equation3].slice(0, numEquations);
 
@@ -61,26 +61,37 @@ export default function SystemsModule() {
     return 'unique';
   }, [intersection]);
 
-  const augmentedMatrix = useMemo(() => equations.map((eq) => [eq.a, eq.b, eq.c]), [equations]);
-
-  const reductionSteps = [
-    { label: 'Original', matrix: augmentedMatrix },
+  const steps = [
     {
-      label: 'R2 → R2 - (a₂/a₁)R1',
-      matrix: equations.length < 2 ? augmentedMatrix : [
-        augmentedMatrix[0],
-        [equations[1].a - (equations[1].a / equations[0].a) * equations[0].a,
-         equations[1].b - (equations[1].a / equations[0].a) * equations[0].b,
-         equations[1].c - (equations[1].a / equations[0].a) * equations[0].c],
-      ],
+      title: 'One Equation = One Line',
+      concept: 'In 2D, each linear equation represents a line. The solution to the system is where the lines intersect!',
+      hint: 'Look at the colored lines on the canvas. Each equation is a line.',
+      action: 'Observe how equations form lines',
     },
-  ];
-
-  const guidedSteps = [
-    { title: 'One Equation = One Line', description: 'In 2D, each linear equation represents a line. The solution to the system is where the lines intersect.', formula: 'ax + by = c' },
-    { title: 'Types of Solutions', description: 'Systems can have no solution (parallel lines), one solution (intersecting lines), or infinitely many (same line).', formula: 'Unique: det ≠ 0 | Infinite: same line | None: parallel' },
-    { title: 'Row Reduction', description: 'We can solve systems by eliminating variables row by row. This is called Gaussian elimination.', formula: 'Augmented matrix: [A|b]' },
-    { title: 'The Matrix View', description: 'A system Ax = b can be solved by row-reducing the augmented matrix [A|b] and reading off x.', formula: 'x = A^{-1}b (when det(A) ≠ 0)' },
+    {
+      title: 'Types of Solutions',
+      concept: solutionType === 'unique'
+        ? `Unique solution at (${intersection?.x.toFixed(2)}, ${intersection?.y.toFixed(2)}) — lines intersect at one point!`
+        : solutionType === 'none'
+          ? 'No solution — the lines are parallel and never meet!'
+          : solutionType === 'infinite'
+            ? 'Infinite solutions — the lines are the same!'
+            : 'Add 2+ equations to find intersection.',
+      hint: 'The badge in the right panel shows the solution type.',
+      action: 'Check the solution type badge',
+    },
+    {
+      title: 'Row Reduction Preview',
+      concept: 'Gaussian elimination solves systems by eliminating variables row by row. The augmented matrix [A|b] captures the system.',
+      hint: 'Look at the augmented matrix in the right panel.',
+      action: 'View the augmented matrix format',
+    },
+    {
+      title: 'The Matrix View',
+      concept: 'The system Ax = b can be solved using A⁻¹b when det(A) ≠ 0. The matrix captures the entire system!',
+      hint: 'The matrix view shows the same system in compact form.',
+      action: 'Compare equation and matrix views',
+    },
   ];
 
   const getLinePath = (line, vb) => {
@@ -89,227 +100,307 @@ export default function SystemsModule() {
     return `M ${-vb / 2} ${-(line.slope * (-vb / 2) + line.intercept)} L ${vb / 2} ${-(line.slope * (vb / 2) + line.intercept)}`;
   };
 
-  const colors = ['oklch(50% 0.12 235)', 'oklch(52% 0.16 155)', 'oklch(65% 0.10 70)'];
-
-  const solutionBadgeStyle = solutionType === 'unique'
-    ? { backgroundColor: 'rgba(75,180,140,0.10)', border: '1px solid rgba(75,180,140,0.3)', icon: <Check className="w-4 h-4" style={{ color: 'oklch(52% 0.16 155)' }} /> }
-    : solutionType === 'none'
-    ? { backgroundColor: 'rgba(220,75,55,0.08)', border: '1px solid rgba(220,75,55,0.25)', icon: <AlertCircle className="w-4 h-4" style={{ color: 'oklch(52% 0.16 25)' }} /> }
-    : solutionType === 'infinite'
-    ? { backgroundColor: 'rgba(200,155,50,0.08)', border: '1px solid rgba(200,155,50,0.25)', icon: <Infinity className="w-4 h-4" style={{ color: 'oklch(65% 0.10 70)' }} /> }
-    : { backgroundColor: 'var(--color-paper-2)', border: '1px solid var(--color-rule)', icon: null };
-
   return (
     <div className="h-full flex flex-col overflow-hidden">
-      <div className="mb-3">
-        <h2 className="text-xl font-bold mb-1" style={{ color: 'var(--color-ink)', fontFamily: 'var(--font-display)' }}>
-          Systems of Equations
-        </h2>
-        <p className="text-sm" style={{ color: 'var(--color-muted)' }}>
-          Explore how lines intersect to solve systems — one point, none, or infinite solutions.
-        </p>
+      {/* Top Control Bar */}
+      <div
+        className="flex items-center gap-2 px-3 py-2 border-b flex-shrink-0 flex-wrap"
+        style={{ backgroundColor: 'var(--color-paper)', borderColor: 'var(--color-rule)' }}
+      >
+        <div className="flex items-center gap-2">
+          <Button
+            variant={numEquations === 2 ? 'primary' : 'ghost'}
+            size="sm"
+            onClick={() => setNumEquations(2)}
+          >
+            2 eq.
+          </Button>
+          <Button
+            variant={numEquations === 3 ? 'primary' : 'ghost'}
+            size="sm"
+            onClick={() => setNumEquations(3)}
+          >
+            3 eq.
+          </Button>
+        </div>
+
+        <div className="flex-1" />
+
+        <div className="flex items-center gap-2">
+          <Button
+            variant={showGame ? 'primary' : 'ghost'}
+            size="sm"
+            icon={Gamepad2}
+            onClick={() => setShowGame(!showGame)}
+          >
+            Mini-Game
+          </Button>
+        </div>
       </div>
 
-      {isGuidedMode && (
-        <Card variant="elevated" className="mb-3">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-semibold" style={{ color: 'var(--color-ink)' }}>
-              Step {guidedStep + 1}: {guidedSteps[guidedStep]?.title}
-            </h3>
-            <span className="text-xs" style={{ color: 'var(--color-muted)', fontFamily: 'var(--font-mono)' }}>
-              {guidedStep + 1}/{guidedSteps.length}
-            </span>
-          </div>
-          <p className="text-sm mb-3" style={{ color: 'var(--color-muted)' }}>
-            {guidedSteps[guidedStep]?.description}
-          </p>
-          <div className="p-3 rounded-lg" style={{ backgroundColor: 'var(--color-paper-2)' }}>
-            <FormulaRenderer expression={guidedSteps[guidedStep]?.formula || ''} displayMode />
-          </div>
-          <div className="flex gap-2 mt-3">
-            <Button size="sm" variant="secondary" onClick={() => setGuidedStep(Math.max(0, guidedStep - 1))} disabled={guidedStep === 0}>Back</Button>
-            <Button size="sm" variant="primary" onClick={() => setGuidedStep(Math.min(guidedSteps.length - 1, guidedStep + 1))}>
-              {guidedStep === guidedSteps.length - 1 ? 'Done' : 'Next'}
-            </Button>
-          </div>
-        </Card>
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 flex-1 min-h-0">
-        <Card variant="default" className="flex flex-col">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-semibold" style={{ color: 'var(--color-ink)' }}>Canvas</h3>
-            <div className="flex gap-2">
-              {[2, 3].map((n) => (
-                <Button key={n} size="sm" variant={numEquations === n ? 'primary' : 'outline'} onClick={() => setNumEquations(n)}>{n} eq.</Button>
-              ))}
-              <Button size="sm" variant={showGame ? 'primary' : 'ghost'} icon={Gamepad2} onClick={() => setShowGame(!showGame)}>Mini-Game</Button>
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+        {/* Guided Learning Card */}
+        <div
+          className="px-4 py-2.5 border-b flex-shrink-0"
+          style={{
+            background: 'linear-gradient(to right, rgba(75,150,200,0.06), rgba(75,200,150,0.06))',
+            borderColor: 'var(--color-rule)',
+          }}
+        >
+          <div className="flex items-center gap-3 max-w-full">
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold"
+                style={{ backgroundColor: 'var(--color-accent)', color: 'var(--color-paper)', fontFamily: 'var(--font-mono)' }}>
+                {currentStep + 1}
+              </div>
+              <span className="text-xs font-semibold" style={{ color: 'var(--color-muted)', fontFamily: 'var(--font-mono)' }}>
+                / {steps.length}
+              </span>
             </div>
-          </div>
-
-          {showGame && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="flex-1 mt-4"
-            >
-              <GameWrapper
-                title="Solve the System"
-                instructions="Set up and solve the system of equations"
-                maxAttempts={5}
-                rounds={5}
-                scoring="accuracy"
+            <div className="w-px h-8 flex-shrink-0" style={{ backgroundColor: 'var(--color-rule)' }} />
+            <div className="flex-1 min-w-0 overflow-hidden">
+              <h3 className="text-sm font-bold mb-0.5 truncate" style={{ color: 'var(--color-ink)', fontFamily: 'var(--font-display)' }}>
+                {steps[currentStep].title}
+              </h3>
+              <p className="text-xs leading-relaxed" style={{ color: 'var(--color-muted)' }}>
+                {steps[currentStep].concept}
+              </p>
+            </div>
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              <button
+                onClick={() => setCurrentStep(Math.max(0, currentStep - 1))}
+                className="px-2.5 py-1 rounded-lg text-xs font-semibold transition-all"
+                style={{
+                  backgroundColor: currentStep > 0 ? 'var(--color-paper-2)' : 'transparent',
+                  color: currentStep > 0 ? 'var(--color-ink)' : 'transparent',
+                  cursor: currentStep > 0 ? 'pointer' : 'default',
+                }}
+                disabled={currentStep <= 0}
               >
-                {(props) => <SolveTheSystem {...props} />}
-              </GameWrapper>
-            </motion.div>
-          )}
-
-          {!showGame && (
-            <>
-            <div className="flex-1 min-h-0 rounded-lg overflow-hidden" style={{ backgroundColor: 'var(--color-paper)' }}>
-              <Grid2D>
-                <svg width="100%" height="100%" viewBox="-6 -6 12 12" preserveAspectRatio="xMidYMid meet">
-                  {equations.map((eq, i) => (
-                    <motion.path
-                      key={i}
-                      d={getLinePath(getLineForEquation(eq), 12)}
-                      stroke={colors[i]}
-                      strokeWidth="0.08"
-                      strokeDasharray="0.2 0.1"
-                      fill="none"
-                      initial={{ pathLength: 0 }}
-                      animate={{ pathLength: 1 }}
-                      transition={{ duration: 0.5, delay: i * 0.1 }}
-                    />
-                  ))}
-                  {solutionType === 'unique' && intersection && (
-                    <motion.g initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 300 }}>
-                      <circle cx={intersection.x} cy={-intersection.y} r="0.2" fill="oklch(52% 0.16 25)" />
-                      <circle cx={intersection.x} cy={-intersection.y} r="0.3" fill="oklch(52% 0.16 25)" opacity="0.3">
-                        <animate attributeName="r" values="0.3;0.5;0.3" dur="2s" repeatCount="indefinite" />
-                        <animate attributeName="opacity" values="0.3;0.1;0.3" dur="2s" repeatCount="indefinite" />
-                      </circle>
-                    </motion.g>
-                  )}
-                  {solutionType === 'none' && (
-                    <text x="-2" y="0" fontSize="8" fill="oklch(52% 0.16 25)">No Solution</text>
-                  )}
-                  {solutionType === 'infinite' && (
-                    <text x="-2" y="0" fontSize="8" fill="oklch(52% 0.16 155)">Infinite Solutions</text>
-                  )}
-                </svg>
-              </Grid2D>
-            </div>
-            <div className="mt-3 space-y-2">
-              {equations.map((eq, i) => (
-                <div key={i} className="flex gap-2 items-center text-sm">
-                  <span className="w-3 h-3 rounded-full" style={{ backgroundColor: colors[i] }} />
-                  <span style={{ color: 'var(--color-ink-2)' }}>
-                    Eq {i + 1}: {eq.a}x + {eq.b}y = {eq.c}
-                  </span>
-                </div>
-              ))}
-            </div>
-            <div className="mt-3 p-3 rounded-lg" style={solutionBadgeStyle}>
-              <div className="flex items-center gap-2">
-                {solutionBadgeStyle.icon}
-                <span className="font-medium capitalize" style={{ color: 'var(--color-ink)' }}>{solutionType} Solution</span>
+                ←
+              </button>
+              <div className="flex items-center gap-1">
+                {steps.map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setCurrentStep(i)}
+                    className="rounded-full transition-all duration-200"
+                    style={{
+                      width: currentStep === i ? '10px' : '5px',
+                      height: '5px',
+                      backgroundColor: currentStep === i ? 'var(--color-accent)' : 'var(--color-rule)',
+                      cursor: 'pointer',
+                    }}
+                  />
+                ))}
               </div>
-              {solutionType === 'unique' && intersection && (
-                <p className="text-sm mt-1" style={{ color: 'var(--color-muted)' }}>
-                  x = {intersection.x.toFixed(2)}, y = {intersection.y.toFixed(2)}
-                </p>
-              )}
+              <button
+                onClick={() => setCurrentStep(Math.min(steps.length - 1, currentStep + 1))}
+                className="px-2.5 py-1 rounded-lg text-xs font-semibold transition-all"
+                style={{
+                  backgroundColor: currentStep < steps.length - 1 ? 'var(--color-accent)' : 'transparent',
+                  color: currentStep < steps.length - 1 ? 'var(--color-paper)' : 'transparent',
+                  cursor: currentStep < steps.length - 1 ? 'pointer' : 'default',
+                }}
+                disabled={currentStep >= steps.length - 1}
+              >
+                →
+              </button>
             </div>
-            </>
-          )}
-        </Card>
+          </div>
+        </div>
 
-        <Card variant="default" className="flex flex-col">
-          <h3 className="font-semibold mb-3" style={{ color: 'var(--color-ink)' }}>Formula Panel</h3>
-          <div className="space-y-3 flex-1 overflow-auto">
-            <div>
-              <h4 className="text-xs font-medium mb-1" style={{ color: 'var(--color-muted)' }}>Matrix Form</h4>
-              <div className="p-2 rounded-lg" style={{ backgroundColor: 'var(--color-paper-2)' }}>
-                <FormulaRenderer expression={`\\begin{pmatrix} ${equations.map(e => e.a).join(' & ')} \\\\ ${equations.map(e => e.b).join(' & ')} \\end{pmatrix} \\begin{pmatrix} x \\\\ y \\end{pmatrix} = \\begin{pmatrix} ${equations.map(e => e.c).join(' \\\\ ')} \\end{pmatrix}`} displayMode />
+        {/* Canvas + Right Panel */}
+        <div className="flex-1 flex min-h-0 overflow-hidden">
+          {/* Main Canvas area */}
+          <div className="flex-1 min-h-0 min-w-0 relative flex flex-col">
+            {showGame ? (
+              <div className="flex-1 flex items-center justify-center p-4" style={{ backgroundColor: 'var(--color-paper)' }}>
+                <GameWrapper
+                  title="Solve the System"
+                  instructions="Set up and solve the system of equations"
+                  maxAttempts={5}
+                  rounds={5}
+                  scoring="accuracy"
+                >
+                  {(props) => <SolveTheSystem {...props} />}
+                </GameWrapper>
               </div>
-            </div>
-            <div>
-              <h4 className="text-xs font-medium mb-1" style={{ color: 'var(--color-muted)' }}>Augmented Matrix [A|b]</h4>
-              <div className="p-2 rounded-lg" style={{ backgroundColor: 'var(--color-paper-2)', fontFamily: 'var(--font-mono)', fontSize: '0.875rem', color: 'var(--color-ink)' }}>
-                <div className="flex gap-1">
-                  <div className="flex flex-col gap-1">
+            ) : (
+              <>
+                {/* Canvas */}
+                <div className="flex-1 min-h-0" style={{ backgroundColor: 'var(--color-paper)' }}>
+                  <svg width="100%" height="100%" viewBox="-6 -6 12 12" preserveAspectRatio="xMidYMid meet">
+                    {/* Grid */}
+                    {Array.from({ length: 13 }).map((_, i) => (
+                      <g key={i}>
+                        <line x1={i - 6} y1="-6" x2={i - 6} y2="6" stroke="var(--color-rule)" strokeWidth="0.05" />
+                        <line x1="-6" y1={i - 6} x2="6" y2={i - 6} stroke="var(--color-rule)" strokeWidth="0.05" />
+                      </g>
+                    ))}
+                    {/* Axes */}
+                    <line x1="-6" y1="0" x2="6" y2="0" stroke="var(--color-neutral)" strokeWidth="0.1" />
+                    <line x1="0" y1="-6" x2="0" y2="6" stroke="var(--color-neutral)" strokeWidth="0.1" />
+
+                    {/* Lines */}
                     {equations.map((eq, i) => (
-                      <div key={i} className="flex gap-1">
-                        <span className="w-6 text-center">{eq.a}</span>
-                        <span className="w-6 text-center">{eq.b}</span>
+                      <motion.path
+                        key={i}
+                        d={getLinePath(getLineForEquation(eq), 12)}
+                        stroke={COLORS[i]}
+                        strokeWidth="0.1"
+                        strokeDasharray="0.15 0.1"
+                        fill="none"
+                        initial={{ pathLength: 0 }}
+                        animate={{ pathLength: 1 }}
+                        transition={{ duration: 0.5, delay: i * 0.1 }}
+                      />
+                    ))}
+
+                    {/* Intersection point */}
+                    {solutionType === 'unique' && intersection && (
+                      <motion.g initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 300 }}>
+                        <circle cx={intersection.x} cy={-intersection.y} r="0.15" fill="oklch(52% 0.16 25)" />
+                        <circle cx={intersection.x} cy={-intersection.y} r="0.25" fill="oklch(52% 0.16 25)" opacity="0.3">
+                          <animate attributeName="r" values="0.25;0.4;0.25" dur="2s" repeatCount="indefinite" />
+                          <animate attributeName="opacity" values="0.3;0.1;0.3" dur="2s" repeatCount="indefinite" />
+                        </circle>
+                      </motion.g>
+                    )}
+                  </svg>
+                </div>
+
+                {/* Equations info */}
+                <div className="p-3 border-t" style={{ borderColor: 'var(--color-rule)', backgroundColor: 'var(--color-paper)' }}>
+                  <div className="flex gap-3 flex-wrap">
+                    {equations.map((eq, i) => (
+                      <div key={i} className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[i] }} />
+                        <span style={{ color: 'var(--color-ink-2)', fontFamily: 'var(--font-mono)', fontSize: '0.875rem' }}>
+                          {eq.a}x + {eq.b}y = {eq.c}
+                        </span>
                       </div>
                     ))}
                   </div>
-                  <div className="w-px mx-1" style={{ backgroundColor: 'var(--color-rule)' }} />
-                  <div className="flex flex-col gap-1">
-                    {equations.map((eq, i) => <span key={i} className="w-6 text-center">{eq.c}</span>)}
-                  </div>
                 </div>
+              </>
+            )}
+          </div>
+
+          {/* Right Panel */}
+          <div
+            className="w-64 lg:w-72 xl:w-80 flex-shrink-0 min-h-0 overflow-y-auto overflow-x-hidden border-l"
+            style={{ backgroundColor: 'var(--color-paper)', borderColor: 'var(--color-rule)' }}
+          >
+            <div className="p-3 space-y-3">
+              {/* Solution Status */}
+              <div
+                className="p-3 rounded-xl"
+                style={
+                  solutionType === 'unique'
+                    ? { backgroundColor: 'rgba(75,180,140,0.10)' }
+                    : solutionType === 'none'
+                      ? { backgroundColor: 'rgba(220,75,55,0.08)' }
+                      : solutionType === 'infinite'
+                        ? { backgroundColor: 'rgba(200,155,50,0.08)' }
+                        : { backgroundColor: 'var(--color-paper-2)' }
+                }
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  {solutionType === 'unique' && <Check className="w-4 h-4" style={{ color: 'oklch(52% 0.16 155)' }} />}
+                  {solutionType === 'none' && <AlertCircle className="w-4 h-4" style={{ color: 'oklch(52% 0.16 25)' }} />}
+                  {solutionType === 'infinite' && <Infinity className="w-4 h-4" style={{ color: 'oklch(65% 0.10 70)' }} />}
+                  <span className="text-xs font-semibold capitalize" style={{ color: 'var(--color-ink)' }}>
+                    {solutionType} Solution
+                  </span>
+                </div>
+                {solutionType === 'unique' && intersection && (
+                  <p className="text-sm" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-ink)' }}>
+                    x = {intersection.x.toFixed(2)}, y = {intersection.y.toFixed(2)}
+                  </p>
+                )}
+                {solutionType === 'none' && (
+                  <p className="text-xs" style={{ color: 'var(--color-muted)' }}>Lines are parallel — no intersection</p>
+                )}
+                {solutionType === 'infinite' && (
+                  <p className="text-xs" style={{ color: 'var(--color-muted)' }}>Lines coincide — infinitely many solutions</p>
+                )}
               </div>
-            </div>
-            {reductionSteps[reductionStep] && (
-              <div>
-                <h4 className="text-xs font-medium mb-1" style={{ color: 'var(--color-muted)' }}>Row Op: {reductionSteps[reductionStep].label}</h4>
-                <div className="p-2 rounded-lg" style={{ backgroundColor: 'var(--color-paper-2)', fontFamily: 'var(--font-mono)', fontSize: '0.875rem' }}>
-                  <div className="flex gap-1">
+
+              {/* Augmented Matrix */}
+              <div className="p-3 rounded-xl" style={{ backgroundColor: 'var(--color-paper-2)' }}>
+                <div className="text-xs font-medium mb-2" style={{ color: 'var(--color-neutral)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                  Augmented Matrix [A|b]
+                </div>
+                <div className="p-2 rounded-lg" style={{ backgroundColor: 'var(--color-paper)', fontFamily: 'var(--font-mono)', fontSize: '0.875rem' }}>
+                  <div className="flex gap-1 justify-center">
                     <div className="flex flex-col gap-1">
-                      {reductionSteps[reductionStep].matrix.map((row, i) => (
+                      {equations.map((eq, i) => (
                         <div key={i} className="flex gap-1">
-                          <span className="w-6 text-center" style={{ color: i === 1 && reductionStep > 0 ? 'oklch(50% 0.12 235)' : 'var(--color-ink)' }}>{row[0].toFixed(1)}</span>
-                          <span className="w-6 text-center" style={{ color: i === 1 && reductionStep > 0 ? 'oklch(50% 0.12 235)' : 'var(--color-ink)' }}>{row[1].toFixed(1)}</span>
+                          <span className="w-8 text-center">{eq.a.toFixed(1)}</span>
+                          <span className="w-8 text-center">{eq.b.toFixed(1)}</span>
                         </div>
                       ))}
                     </div>
                     <div className="w-px mx-1" style={{ backgroundColor: 'var(--color-rule)' }} />
-                    <div className="flex flex-col gap-1">
-                      {reductionSteps[reductionStep].matrix.map((row, i) => (
-                        <span key={i} className="w-6 text-center" style={{ color: i === 1 && reductionStep > 0 ? 'oklch(65% 0.10 70)' : 'var(--color-ink)' }}>{row[2].toFixed(1)}</span>
+                    <div className="flex flex-col gap-1 justify-center">
+                      {equations.map((eq, i) => (
+                        <span key={i} className="w-8 text-center">{eq.c.toFixed(1)}</span>
                       ))}
                     </div>
                   </div>
                 </div>
-                <div className="flex gap-1 mt-2">
-                  <Button size="sm" variant="ghost" onClick={() => setReductionStep(0)} disabled={reductionStep === 0}>Reset</Button>
-                  <Button size="sm" variant="outline" onClick={() => setReductionStep(Math.min(reductionSteps.length - 1, reductionStep + 1))} disabled={reductionStep === reductionSteps.length - 1}>Next Step</Button>
+              </div>
+
+              {/* Matrix Form */}
+              <div className="p-3 rounded-xl" style={{ backgroundColor: 'var(--color-paper-2)' }}>
+                <div className="text-xs font-medium mb-2" style={{ color: 'var(--color-neutral)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                  Matrix Form: Ax = b
+                </div>
+                <div className="p-2 rounded-lg" style={{ backgroundColor: 'var(--color-paper)', fontFamily: 'var(--font-mono)', fontSize: '0.75rem' }}>
+                  <div className="flex gap-1 items-center">
+                    <div className="flex flex-col gap-0.5">
+                      {equations.map((eq, i) => (
+                        <div key={i} className="flex gap-0.5">
+                          <span className="w-6 text-center">{eq.a.toFixed(1)}</span>
+                          <span className="w-6 text-center">{eq.b.toFixed(1)}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <span style={{ color: 'var(--color-muted)' }}>[x]</span>
+                    <span style={{ color: 'var(--color-muted)' }}>=</span>
+                    <div className="flex flex-col gap-0.5">
+                      {equations.map((eq, i) => (
+                        <span key={i} className="w-6 text-center">{eq.c.toFixed(1)}</span>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
-            )}
-            <div>
-              <h4 className="text-xs font-medium mb-1" style={{ color: 'var(--color-muted)' }}>Solution Vector</h4>
-              <div className="p-2 rounded-lg" style={{ backgroundColor: 'var(--color-paper-2)' }}>
-                {solutionType === 'unique' && intersection ? (
-                  <FormulaRenderer expression={`\\vec{x} = \\begin{pmatrix} ${intersection.x.toFixed(2)} \\\\ ${intersection.y.toFixed(2)} \\end{pmatrix}`} displayMode />
-                ) : solutionType === 'infinite' ? (
-                  <span style={{ color: 'oklch(52% 0.16 155)' }}>Infinitely many solutions</span>
-                ) : solutionType === 'none' ? (
-                  <span style={{ color: 'oklch(52% 0.16 25)' }}>No solution exists</span>
-                ) : (
-                  <span className="text-sm" style={{ color: 'var(--color-muted)' }}>Add 2+ equations to solve</span>
-                )}
+
+              {/* Hint */}
+              <div className="p-3 rounded-xl" style={{ backgroundColor: 'rgba(200,155,50,0.08)', border: '1px solid oklch(65% 0.10 70)' }}>
+                <div className="text-xs font-medium mb-1" style={{ color: 'oklch(65% 0.10 70)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  Hint
+                </div>
+                <p className="text-xs" style={{ color: 'oklch(65% 0.10 70)' }}>
+                  {steps[currentStep].hint}
+                </p>
               </div>
             </div>
           </div>
-        </Card>
-      </div>
+        </div>
 
-      <div
-        className="px-6 py-2 text-sm flex items-center justify-center gap-4 border-t"
-        style={{
-          backgroundColor: 'var(--color-paper-2)',
-          borderColor: 'var(--color-rule)',
-          color: 'var(--color-muted)',
-        }}
-      >
-        <span>Lines intersect at the solution</span>
-        <span>•</span>
-        <CompletionToggle moduleId={5} />
+        {/* Footer */}
+        <div
+          className="px-4 py-2 flex items-center justify-center gap-4 border-t flex-shrink-0"
+          style={{ backgroundColor: 'var(--color-paper)', borderColor: 'var(--color-rule)', color: 'var(--color-muted)' }}
+        >
+          <span className="text-xs">Action: {steps[currentStep].action}</span>
+          <span>•</span>
+          <CompletionToggle moduleId={5} />
+        </div>
       </div>
     </div>
   );
