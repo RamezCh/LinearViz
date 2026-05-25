@@ -1,8 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Slider } from '../components/UI/Slider.jsx';
 import { Button } from '../components/UI/Button.jsx';
-import { multiply } from '../utils/linalg.js';
 
 const PRESET_TRANSFORMATIONS = [
   { name: 'Rotation 90°', matrix: [[0, -1], [1, 0]], color: '#3b82f6' },
