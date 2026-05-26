@@ -421,3 +421,200 @@ export function crossProduct(u, v) {
     u[0] * v[1] - u[1] * v[0],
   ];
 }
+
+// --- Transformation Matrix Generators ---
+export function identityMatrix() {
+  return [[1, 0], [0, 1]];
+}
+
+export function rotationMatrix(angleDeg) {
+  const rad = angleDeg * Math.PI / 180;
+  const c = Math.cos(rad);
+  const s = Math.sin(rad);
+  return [
+    [c, -s],
+    [s, c],
+  ];
+}
+
+export function scaleMatrix(sx, sy) {
+  return [
+    [sx, 0],
+    [0, sy],
+  ];
+}
+
+export function shearMatrix(kx, ky = 0) {
+  return [
+    [1, kx],
+    [ky, 1],
+  ];
+}
+
+export function reflectMatrix(axis) {
+  switch (axis) {
+    case 'x':
+      return [[1, 0], [0, -1]];
+    case 'y':
+      return [[-1, 0], [0, 1]];
+    case 'origin':
+      return [[-1, 0], [0, -1]];
+    case 'y=x':
+      return [[0, 1], [1, 0]];
+    case 'y=-x':
+      return [[0, -1], [-1, 0]];
+    default:
+      return identityMatrix();
+  }
+}
+
+// --- Transformation Application ---
+export function applyMatrix(M, v) {
+  const [a, b] = M[0];
+  const [c, d] = M[1];
+  const [x, y] = v;
+  return [a * x + b * y, c * x + d * y];
+}
+
+export function transformPoint(M, p) {
+  return applyMatrix(M, p);
+}
+
+export function isInvertible(M) {
+  return Math.abs(det2x2(M)) > 1e-10;
+}
+
+export function composeTransforms(A, B) {
+  return multiply(A, B);
+}
+
+// --- Matrix Operations ---
+export function matSubtract(A, B) {
+  return subtract(A, B);
+}
+
+export function matMultiplyVec(M, v) {
+  return applyMatrix(M, v);
+}
+
+export function traceMatrix(M) {
+  return M[0][0] + M[1][1];
+}
+
+export function adjugate2x2(M) {
+  return [
+    [M[1][1], -M[0][1]],
+    [-M[1][0], M[0][0]],
+  ];
+}
+
+// --- Row Reduction (Gauss-Jordan) ---
+export function rowReduce(augmented) {
+  const steps = [];
+  const n = augmented.length;
+  const m = augmented[0].length;
+  
+  let matrix = augmented.map(row => [...row]);
+  
+  const copyMatrix = (m) => m.map(row => [...row]);
+  
+  const formatOp = (type, details) => {
+    switch (type) {
+      case 'swap':
+        return `Swap R${details.i + 1} ↔ R${details.j + 1}`;
+      case 'scale':
+        return `R${details.i + 1} → ${details.factor.toFixed(2)} · R${details.i + 1}`;
+      case 'add':
+        return `R${details.i + 1} → R${details.i + 1} + ${details.factor.toFixed(2)} · R${details.j + 1}`;
+      default:
+        return '';
+    }
+  };
+
+  let pivotRow = 0;
+  let pivotCol = 0;
+  
+  while (pivotRow < n && pivotCol < m - n) {
+    let maxRow = pivotRow;
+    for (let i = pivotRow + 1; i < n; i++) {
+      if (Math.abs(matrix[i][pivotCol]) > Math.abs(matrix[maxRow][pivotCol])) {
+        maxRow = i;
+      }
+    }
+    
+    if (Math.abs(matrix[maxRow][pivotCol]) < 1e-10) {
+      pivotCol++;
+      continue;
+    }
+    
+    if (maxRow !== pivotRow) {
+      [matrix[pivotRow], matrix[maxRow]] = [matrix[maxRow], matrix[pivotRow]];
+      steps.push({
+        matrix: copyMatrix(matrix),
+        operation: formatOp('swap', { i: pivotRow, j: maxRow }),
+      });
+    }
+    
+    const pivot = matrix[pivotRow][pivotCol];
+    if (Math.abs(pivot - 1) > 1e-10) {
+      for (let j = pivotCol; j < m; j++) {
+        matrix[pivotRow][j] /= pivot;
+      }
+      steps.push({
+        matrix: copyMatrix(matrix),
+        operation: formatOp('scale', { i: pivotRow, factor: 1 / pivot }),
+      });
+    }
+    
+    for (let i = 0; i < n; i++) {
+      if (i !== pivotRow && Math.abs(matrix[i][pivotCol]) > 1e-10) {
+        const factor = matrix[i][pivotCol];
+        for (let j = pivotCol; j < m; j++) {
+          matrix[i][j] -= factor * matrix[pivotRow][j];
+        }
+        steps.push({
+          matrix: copyMatrix(matrix),
+          operation: formatOp('add', { i: i, j: pivotRow, factor: -factor }),
+        });
+      }
+    }
+    
+    pivotRow++;
+    pivotCol++;
+  }
+  
+  return { steps, result: matrix };
+}
+
+// --- Test Functions ---
+/*
+console.assert(JSON.stringify(identityMatrix()) === '[[1,0],[0,1]]', 'identityMatrix test failed');
+console.assert(Math.abs(rotationMatrix(90)[0][0]) < 1e-10, 'rotationMatrix cos test failed');
+console.assert(Math.abs(rotationMatrix(90)[0][1] + 1) < 1e-10, 'rotationMatrix sin test failed');
+console.assert(rotationMatrix(0)[0][0] === 1, 'rotationMatrix 0 deg test failed');
+
+console.assert(JSON.stringify(scaleMatrix(2, 3)) === '[[2,0],[0,3]]', 'scaleMatrix test failed');
+console.assert(JSON.stringify(shearMatrix(1)) === '[[1,1],[0,1]]', 'shearMatrix test failed');
+console.assert(JSON.stringify(shearMatrix(1, 2)) === '[[1,1],[2,1]]', 'shearMatrix with ky test failed');
+
+console.assert(JSON.stringify(reflectMatrix('x')) === '[[1,0],[0,-1]]', 'reflectMatrix x failed');
+console.assert(JSON.stringify(reflectMatrix('y')) === '[[-1,0],[0,1]]', 'reflectMatrix y failed');
+console.assert(JSON.stringify(reflectMatrix('y=x')) === '[[0,1],[1,0]]', 'reflectMatrix y=x failed');
+
+console.assert(JSON.stringify(applyMatrix([[1, 2], [3, 4]], [1, 1])) === '[3,7]', 'applyMatrix test failed');
+console.assert(JSON.stringify(transformPoint([[1, 2], [3, 4]], [1, 1])) === '[3,7]', 'transformPoint test failed');
+console.assert(isInvertible([[1, 2], [3, 4]]) === true, 'isInvertible true test failed');
+console.assert(isInvertible([[1, 1], [2, 2]]) === false, 'isInvertible false test failed');
+
+const composed = composeTransforms([[2, 0], [0, 2]], [[1, 1], [0, 1]]);
+console.assert(composed[0][0] === 2, 'composeTransforms test failed');
+console.assert(composed[0][1] === 2, 'composeTransforms test failed');
+
+console.assert(traceMatrix([[1, 2], [3, 4]]) === 5, 'traceMatrix test failed');
+console.assert(JSON.stringify(adjugate2x2([[1, 2], [3, 4]])) === '[[4,-2],[-3,1]]', 'adjugate2x2 test failed');
+
+const augmented = [[1, 1, 1, 0], [2, 3, 0, 1]];
+const gaussResult = rowReduce(augmented);
+console.assert(gaussResult.steps.length > 0, 'rowReduce steps test failed');
+console.assert(gaussResult.result.length === 2, 'rowReduce result test failed');
+*/

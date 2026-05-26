@@ -25,10 +25,10 @@ export const MODULE_IDS = {
   LINEAR_TRANSFORMATIONS: 2,
   MATRIX_OPS: 3,
   DETERMINANTS: 4,
-  SYSTEMS: 5,
-  VECTOR_SPACES: 6,
-  EIGENVALUES: 7,
-  ORTHOGONALITY: 8,
+  INVERSE_MATRICES: 5,
+  EIGENVALUES: 6,
+  PROJECTIONS: 7,
+  GRAM_SCHMIDT: 8,
   SVD: 9,
 };
 
@@ -44,13 +44,13 @@ export const AVAILABLE_MODULES = Object.keys(MODULE_COMPONENTS).map(id => parseI
 
 export const MODULE_PROGRESS = {
   1: { name: 'Vectors', color: '#3B82F6', available: true },
-  2: { name: 'Linear Transformations', color: '#8B5CF6', available: true },
-  3: { name: 'Matrix Operations', color: '#EC4899', available: true },
-  4: { name: 'Determinants', color: '#10B981', available: true },
-  5: { name: 'Systems of Equations', color: '#F59E0B', available: true },
-  6: { name: 'Vector Spaces', color: '#6366F1', available: true },
-  7: { name: 'Eigenvalues', color: '#14B8A6', available: true },
-  8: { name: 'Orthogonality', color: '#A855F7', available: true },
+  2: { name: 'Linear Transformations', color: '#6366F1', available: true },
+  3: { name: 'Matrix Operations', color: '#8B5CF6', available: true },
+  4: { name: 'Determinants', color: '#EC4899', available: true },
+  5: { name: 'Inverse Matrices', color: '#10B981', available: true },
+  6: { name: 'Eigenvalues', color: '#F59E0B', available: true },
+  7: { name: 'Projections', color: '#14B8A6', available: true },
+  8: { name: 'Gram-Schmidt', color: '#A855F7', available: true },
   9: { name: 'SVD', color: '#EF4444', available: true },
 };
 
@@ -59,21 +59,21 @@ export const MODULE_TITLES = {
   2: 'Linear Transformations',
   3: 'Matrix Operations',
   4: 'Determinants',
-  5: 'Systems of Equations',
-  6: 'Vector Spaces & Subspaces',
-  7: 'Eigenvalues & Eigenvectors',
-  8: 'Orthogonality & Projections',
+  5: 'Inverse Matrices',
+  6: 'Eigenvalues & Eigenvectors',
+  7: 'Projections',
+  8: 'Gram-Schmidt',
   9: 'SVD & Applications',
 };
 
 export const MODULE_DESCRIPTIONS = {
   1: 'Learn about vectors, magnitude, addition, and dot products through interactive visualization.',
-  2: 'Discover how matrices transform space through rotation, scaling, and shear.',
+  2: 'Visualize how matrices transform space through rotation, scaling, shear, and reflection.',
   3: 'Master matrix operations: addition, multiplication, transpose, and inverse.',
   4: 'Understand determinants as area scaling factors with geometric intuition.',
-  5: 'Solve systems of equations graphically and through row reduction.',
-  6: 'Explore span, linear independence, and subspace concepts.',
-  7: 'Find eigenvectors and eigenvalues to understand matrix behavior.',
-  8: 'Learn about projections, Gram-Schmidt, and least squares fitting.',
+  5: 'Learn to invert matrices and understand when inverses exist.',
+  6: 'Find eigenvectors and eigenvalues to understand matrix behavior.',
+  7: 'Project vectors onto lines and subspaces, including orthogonal projections.',
+  8: 'Orthogonalize basis vectors to create orthonormal sets.',
   9: 'Decompose matrices into singular values for compression and analysis.',
 };

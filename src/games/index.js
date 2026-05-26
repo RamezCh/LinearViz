@@ -7,3 +7,8 @@ export { default as InTheSpan } from './InTheSpan.jsx';
 export { default as EigenHunt } from './EigenHunt.jsx';
 export { default as LeastSquaresFit } from './LeastSquaresFit.jsx';
 export { default as SingularGuess } from './SingularGuess.jsx';
+export { default as SumTheShapes } from './SumTheShapes.jsx';
+export { default as MultiplicationRelay } from './MultiplicationRelay.jsx';
+export { default as MirrorIt } from './MirrorIt.jsx';
+export { default as UndoTheTransform } from './UndoTheTransform.jsx';
+export { default as MatrixRelay } from './MatrixRelay.jsx';

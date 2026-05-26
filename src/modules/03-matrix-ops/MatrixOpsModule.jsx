@@ -1,326 +1,233 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Minus, X, RotateCcw, Calculator, Play, Pause, SkipForward, Info, Gamepad2 } from 'lucide-react';
-import { useStore } from '../../store/useStore';
-import CompletionToggle from '../../components/UI/CompletionToggle';
-import { Button } from '../../components/UI/Button';
-import { add, subtract, multiply, transpose, inverse2x2, identity, det2x2 } from '../../utils/linalg';
-import GameWrapper from '../../components/MiniGame/GameWrapper';
-import FillTheProduct from '../../games/FillTheProduct';
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import { ZoomIn, ZoomOut, RotateCcw, Move } from 'lucide-react';
+import MatrixGrid from '../../components/Canvas/MatrixGrid';
+import {
+  det2x2, transpose, inverse2x2, multiply, add, subtract, rowReduce
+} from '../../utils/linalg';
+
+const MIN_ZOOM = 20;
+const MAX_ZOOM = 100;
+const DEFAULT_ZOOM = 40;
 
 export default function MatrixOpsModule() {
-  const { currentModule } = useStore();
-  const [matrixA, setMatrixA] = useState([
-    [2, 1],
-    [1, 3],
-  ]);
-  const [matrixB, setMatrixB] = useState([
-    [1, -1],
-    [2, 1],
-  ]);
-  const [operation, setOperation] = useState('add');
-  const [showGuided, setShowGuided] = useState(true);
+  const [matrixA, setMatrixA] = useState([[2, 1], [1, 3]]);
+  const [matrixB, setMatrixB] = useState([[1, 2], [0, 1]]);
+  const [activeOp, setActiveOp] = useState('multiply');
   const [currentStep, setCurrentStep] = useState(0);
-  const [showGame, setShowGame] = useState(false);
-  const [animationStep, setAnimationStep] = useState(-1);
-  const [isAnimating, setIsAnimating] = useState(false);
-  const [inverseSteps, setInverseSteps] = useState([]);
-  const [multiplySteps, setMultiplySteps] = useState([]);
+  const [zoom, setZoom] = useState(DEFAULT_ZOOM);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [showSteps, setShowSteps] = useState(true);
+  const [showGeometry, setShowGeometry] = useState(true);
+  const [learnMode, setLearnMode] = useState(true);
+  const [highlightCell, setHighlightCell] = useState(null);
+  const [highlightRow, setHighlightRow] = useState(null);
+  const [highlightCol, setHighlightCol] = useState(null);
+  const [gaussSteps, setGaussSteps] = useState([]);
+  const [gaussCurrentStep, setGaussCurrentStep] = useState(0);
+  const [animProgress, setAnimProgress] = useState(1);
+  const [dragging, setDragging] = useState({
+    active: false, matrix: 'A', row: 0, col: 0, startY: 0, startVal: 0
+  });
+
+  const canvasRef = useRef(null);
+  const isPanning = useRef(false);
+  const lastPos = useRef({ x: 0, y: 0 });
+
+  const detA = useMemo(() => det2x2(matrixA), [matrixA]);
+  const detB = useMemo(() => det2x2(matrixB), [matrixB]);
+  const isSingularA = useMemo(() => Math.abs(detA) < 1e-10, [detA]);
+  const isSingularB = useMemo(() => Math.abs(detB) < 1e-10, [detB]);
 
   const resultMatrix = useMemo(() => {
     try {
-      switch (operation) {
-        case 'add':
-          return add(matrixA, matrixB);
-        case 'subtract':
-          return subtract(matrixA, matrixB);
-        case 'multiply':
-          return multiply(matrixA, matrixB);
-        case 'transpose':
-          return transpose(matrixA);
-        case 'inverse':
-          return inverse2x2(matrixA);
-        default:
-          return null;
+      if (activeOp === 'add') {
+        return add(matrixA, matrixB);
+      } else if (activeOp === 'multiply') {
+        return multiply(matrixA, matrixB);
       }
-    } catch (e) {
+      return null;
+    } catch {
       return null;
     }
-  }, [matrixA, matrixB, operation]);
+  }, [matrixA, matrixB, activeOp]);
 
-  const canInverse = useMemo(() => {
-    return det2x2(matrixA) !== 0;
-  }, [matrixA]);
+  const transposeA = useMemo(() => transpose(matrixA), [matrixA]);
+  const transposeB = useMemo(() => transpose(matrixB), [matrixB]);
 
-  const updateMatrixCell = useCallback((matrix, setMatrix, row, col, value) => {
-    const num = parseFloat(value) || 0;
-    setMatrix((prev) => {
-      const newMatrix = prev.map((r) => [...r]);
-      newMatrix[row][col] = num;
-      return newMatrix;
-    });
+  const inverseA = useMemo(() => {
+    if (isSingularA) return null;
+    try {
+      return inverse2x2(matrixA);
+    } catch {
+      return null;
+    }
+  }, [matrixA, isSingularA]);
+
+  useEffect(() => {
+    if (activeOp === 'inverse' && !isSingularA) {
+      const augmented = [
+        [matrixA[0][0], matrixA[0][1], 1, 0],
+        [matrixA[1][0], matrixA[1][1], 0, 1],
+      ];
+      const result = rowReduce(augmented);
+      setGaussSteps(result.steps);
+      setGaussCurrentStep(0);
+    } else {
+      setGaussSteps([]);
+      setGaussCurrentStep(0);
+    }
+  }, [activeOp, matrixA, isSingularA]);
+
+  useEffect(() => {
+    if (activeOp === 'multiply') {
+      let step = 0;
+      const interval = setInterval(() => {
+        const row = step % 2;
+        const col = Math.floor(step / 2) % 2;
+        setHighlightRow(row);
+        setHighlightCol(col);
+        setHighlightCell({ row, col });
+        step++;
+        if (step >= 4) {
+          clearInterval(interval);
+          setTimeout(() => {
+            setHighlightCell(null);
+            setHighlightRow(null);
+            setHighlightCol(null);
+          }, 1000);
+        }
+      }, 800);
+      return () => clearInterval(interval);
+    }
+  }, [activeOp, matrixA, matrixB]);
+
+  const handleDragEntry = useCallback((matrix, row, col, startVal, clientY) => {
+    setDragging({ active: true, matrix, row, col, startY: clientY, startVal });
   }, []);
 
-  const generateMultiplySteps = useCallback(() => {
-    if (operation !== 'multiply') return;
-    const steps = [];
-    for (let i = 0; i < matrixA.length; i++) {
-      for (let j = 0; j < matrixB[0].length; j++) {
-        const products = [];
-        for (let k = 0; k < matrixA[0].length; k++) {
-          products.push({
-            aVal: matrixA[i][k],
-            bVal: matrixB[k][j],
-            aPos: [i, k],
-            bPos: [k, j],
-          });
-        }
-        const sum = products.reduce((acc, p) => acc + p.aVal * p.bVal, 0);
-        steps.push({ i, j, products, sum, result: sum });
-      }
-    }
-    setMultiplySteps(steps);
-  }, [matrixA, matrixB, operation]);
-
-  const generateInverseSteps = useCallback(() => {
-    if (operation !== 'inverse') return;
-    const I = identity(2);
-    const augmented = matrixA.map((row, i) => [...row, ...I[i]]);
-    const steps = [{ matrix: augmented.map((r) => [...r]), description: 'Start with [A|I]', highlight: [] }];
-
-    const a = augmented[0][0];
-    const b = augmented[0][1];
-    const c = augmented[1][0];
-    const d = augmented[1][1];
-
-    if (Math.abs(a) > 1e-10) {
-      const factor = d - (c * b) / a;
-      const scale = 1 / a;
-      steps.push({
-        matrix: [[1, b / a, scale, 0], [c, d, -c * scale, 1]],
-        description: `Divide row 1 by ${a.toFixed(2)} to make pivot 1`,
-        highlight: [[0, 0]],
-        operation: 'scale',
-        row: 0,
-        factor: scale,
-      });
-
-      const newRow1 = [c, d, -c * scale, 1];
-      const newRow0 = [1, b / a, scale, 0];
-      steps.push({
-        matrix: [[1, b / a, scale, 0], [0, factor, -c * scale * b / a + newRow1[2], -c * scale]],
-        description: 'Eliminate below pivot',
-        highlight: [[1, 0]],
-        operation: 'eliminate',
-        row: 1,
-        factor: c,
-      });
-
-      if (Math.abs(factor) > 1e-10) {
-        const scaleFactor = 1 / factor;
-        steps.push({
-          matrix: [[1, b / a, scale, 0], [0, 1, (newRow1[2]) * scaleFactor, -c * scale * scaleFactor]],
-          description: `Scale row 2 by ${factor.toFixed(2)}`,
-          highlight: [[1, 1]],
-          operation: 'scale',
-          row: 1,
-          factor: scaleFactor,
-        });
-
-        const invDet = 1 / (a * d - b * c);
-        steps.push({
-          matrix: [[1, 0, (d) * invDet, (-b) * invDet], [0, 1, (-c) * invDet, (a) * invDet]],
-          description: 'Back-substitute to get A⁻¹',
-          highlight: [],
-          operation: 'done',
-        });
-      }
-    }
-    setInverseSteps(steps);
-  }, [matrixA, operation]);
-
-  useEffect(() => {
-    setAnimationStep(-1);
-    if (operation === 'multiply') {
-      generateMultiplySteps();
-    } else if (operation === 'inverse') {
-      generateInverseSteps();
-    }
-  }, [operation, matrixA, matrixB, generateMultiplySteps, generateInverseSteps]);
-
-  const playAnimation = () => setIsAnimating(true);
-  const pauseAnimation = () => setIsAnimating(false);
-  const stepForward = () => {
-    setAnimationStep((prev) => {
-      const maxSteps = operation === 'multiply' ? multiplySteps.length : inverseSteps.length;
-      return Math.min(prev + 1, maxSteps - 1);
-    });
-  };
-  const resetAnimation = () => {
-    setAnimationStep(-1);
-    setIsAnimating(false);
-  };
-
-  useEffect(() => {
-    if (!isAnimating) return;
-    const maxSteps = operation === 'multiply' ? multiplySteps.length : inverseSteps.length;
-    if (animationStep >= maxSteps - 1) {
-      setIsAnimating(false);
+  const handleMouseMove = useCallback((e) => {
+    if (isPanning.current) {
+      const dx = e.clientX - lastPos.current.x;
+      const dy = e.clientY - lastPos.current.y;
+      setPan(p => ({ x: p.x + dx, y: p.y + dy }));
+      lastPos.current = { x: e.clientX, y: e.clientY };
       return;
     }
-    const timer = setTimeout(() => {
-      setAnimationStep((prev) => Math.min(prev + 1, maxSteps - 1));
-    }, 1000);
-    return () => clearTimeout(timer);
-  }, [isAnimating, animationStep, operation, multiplySteps.length, inverseSteps.length]);
+
+    if (!dragging.active) return;
+
+    const deltaY = dragging.startY - e.clientY;
+    const newVal = Math.round((dragging.startVal + deltaY * 0.05) * 100) / 100;
+    const clampedVal = Math.max(-5, Math.min(5, newVal));
+
+    if (dragging.matrix === 'A') {
+      setMatrixA(prev => {
+        const newA = prev.map(r => [...r]);
+        newA[dragging.row][dragging.col] = clampedVal;
+        return newA;
+      });
+    } else {
+      setMatrixB(prev => {
+        const newB = prev.map(r => [...r]);
+        newB[dragging.row][dragging.col] = clampedVal;
+        return newB;
+      });
+    }
+  }, [dragging]);
+
+  const handleMouseUp = useCallback(() => {
+    isPanning.current = false;
+    setDragging(prev => ({ ...prev, active: false }));
+  }, []);
+
+  const handleMouseDown = useCallback((e) => {
+    if (e.button === 1 || (e.button === 0 && e.altKey)) {
+      isPanning.current = true;
+      lastPos.current = { x: e.clientX, y: e.clientY };
+      return;
+    }
+  }, []);
+
+  const resetAll = useCallback(() => {
+    setMatrixA([[2, 1], [1, 3]]);
+    setMatrixB([[1, 2], [0, 1]]);
+    setActiveOp('multiply');
+    setZoom(DEFAULT_ZOOM);
+    setPan({ x: 0, y: 0 });
+  }, []);
+
+  const zoomIn = () => setZoom(z => Math.min(MAX_ZOOM, z + 10));
+  const zoomOut = () => setZoom(z => Math.max(MIN_ZOOM, z - 10));
 
   const steps = [
     {
-      title: 'Matrix Addition',
-      concept: 'Matrix addition adds corresponding elements: each cell in C equals A plus B at that position. The matrices must be the same size!',
-      hint: 'Try changing values in matrices A and B to see the result update.',
-      action: 'Edit the values in matrices A and B',
+      title: 'Matrices store transformations',
+      concept: 'A matrix is a stored transformation — the numbers tell space where to go. A 2×2 matrix transforms the plane by moving every point. The identity matrix [[1,0],[0,1]] does nothing.',
+      hint: 'Look at how the grid transforms under each matrix.',
+      action: 'Observe how the grid shows transformation effects',
     },
     {
-      title: 'Matrix Subtraction',
-      concept: 'Subtraction works the same way — subtract corresponding elements. A - B tells you how different the matrices are at each position.',
-      hint: 'Click "Subtract" to see element-wise subtraction.',
-      action: 'Click Subtract and compare to addition',
+      title: 'Addition: combining effects',
+      concept: 'Matrix addition adds corresponding entries: A+B = [[a+e, b+f], [c+g, d+h]]. Each entry combines independently. Scaling by 2 + scaling by 1 = scaling by 3!',
+      hint: 'Switch to the Addition tab to see A + B.',
+      action: 'Click the Addition tab and observe the result',
     },
     {
-      title: 'Matrix Multiplication',
-      concept: 'Multiplication is more complex: each element C[i][j] is the dot product of row i from A and column j from B. Watch the animation below!',
-      hint: 'The animation shows how row × column products sum up.',
-      action: 'Watch the dot product animation',
+      title: 'Why addition is simple',
+      concept: 'Each entry adds with no interaction. (A+B)ᵢⱼ = Aᵢⱼ + Bᵢⱼ. It is just element-wise addition. No row-column multiplication, no surprising results.',
+      hint: 'The grids show simple additive transformation.',
+      action: 'Compare A grid + B grid = (A+B) grid',
     },
     {
-      title: 'Transpose',
-      concept: 'The transpose flips the matrix over its diagonal — rows become columns. The (i,j) element of A^T equals the (j,i) element of A.',
-      hint: 'A^T swaps row and column positions.',
-      action: 'Click Transpose and compare A to Aᵀ',
+      title: 'Multiplication: chaining transforms',
+      concept: 'AB means: apply B first, then apply A. The result is one matrix that does both jobs. AB ≠ BA in general — order matters!',
+      hint: 'Switch to Multiplication to see the chain.',
+      action: 'Click Multiplication and watch the three-panel view',
     },
     {
-      title: 'Matrix Inverse',
-      concept: 'The inverse A⁻¹ undoes what A does — multiplying A × A⁻¹ gives the identity matrix. Only matrices with non-zero determinant have inverses.',
-      hint: 'Watch Gaussian elimination step by step!',
-      action: 'Click Inverse and step through elimination',
+      title: 'The row × column rule',
+      concept: 'Cᵢⱼ = rowᵢ(A) · colⱼ(B) = Σ aᵢₖbₖⱼ. Each result entry is a dot product: multiply matching entries and add them up.',
+      hint: 'Watch the highlighted row and column as cells compute.',
+      action: 'See the highlighted row and column for each result cell',
+    },
+    {
+      title: 'Order matters: AB ≠ BA',
+      concept: 'Rotate-then-shear ≠ shear-then-rotate. AB and BA give different results. Matrix multiplication is NOT commutative (AB ≠ BA in general).',
+      hint: 'Compare the results of AB vs BA.',
+      action: 'Try AB and BA — they look different!',
+    },
+    {
+      title: 'Transpose: flipping the matrix',
+      concept: 'The transpose swaps rows and columns: (Aᵀ)ᵢⱼ = Aⱼᵢ. The diagonal stays fixed. Off-diagonal elements mirror across it. Aᵀᵀ = A always.',
+      hint: 'Switch to Transpose and watch the cell migration.',
+      action: 'Click Transpose and observe the diagonal cells',
+    },
+    {
+      title: 'Inverse: the undo operation',
+      concept: 'A⁻¹ perfectly cancels A. A·A⁻¹ = I. Apply A, apply A⁻¹, and you are exactly where you started. Only exists if det ≠ 0.',
+      hint: 'Switch to Inverse to see the inverse matrix.',
+      action: 'Click Inverse tab — look for the inverse grid',
+    },
+    {
+      title: 'Computing the inverse: Gauss-Jordan',
+      concept: 'We turn [A|I] into [I|A⁻¹] using row operations. Every step is tracked. Whatever happens to the right side IS the inverse!',
+      hint: 'Use the Next button to step through Gauss-Jordan.',
+      action: 'Step through the Gauss-Jordan reduction',
+    },
+    {
+      title: 'Free exploration',
+      concept: `You have two matrices:\nA = [[${matrixA[0][0].toFixed(1)}, ${matrixA[0][1].toFixed(1)}], [${matrixA[1][0].toFixed(1)}, ${matrixA[1][1].toFixed(1)}]]\nB = [[${matrixB[0][0].toFixed(1)}, ${matrixB[0][1].toFixed(1)}], [${matrixB[1][0].toFixed(1)}, ${matrixB[1][1].toFixed(1)}]]\n\nAll four tabs are available. Experiment!`,
+      hint: 'Switch between tabs and edit matrix values.',
+      action: 'Edit any matrix entry and switch tabs',
     },
   ];
 
-  const MatrixGrid = ({ matrix, onChange, editable = true, label }) => (
-    <div className="flex flex-col items-center">
-      <p className="text-xs font-semibold mb-1" style={{ color: 'var(--color-muted)' }}>{label}</p>
-      <div className="grid gap-1">
-        {matrix.map((row, i) => (
-          <div key={i} className="flex gap-1">
-            {row.map((val, j) => (
-              <motion.div
-                key={`${i}-${j}`}
-                whileHover={editable ? { scale: 1.05 } : {}}
-                style={{
-                  width: 48,
-                  height: 48,
-                  backgroundColor: 'var(--color-paper)',
-                  border: `1.5px solid var(--color-rule)`,
-                  borderRadius: '0.5rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: editable ? 'pointer' : 'default',
-                  transition: 'all 200ms ease-out',
-                }}
-                onClick={() => {
-                  if (editable && onChange) {
-                    const newVal = prompt(`Enter value for [${i}][${j}]`, val);
-                    if (newVal !== null) onChange(i, j, newVal);
-                  }
-                }}
-              >
-                {typeof val === 'number' ? val.toFixed(1) : val}
-              </motion.div>
-            ))}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-
-  const DotProductAnimation = ({ step }) => {
-    if (!step) return null;
-    return (
-      <div className="rounded-xl p-4" style={{ backgroundColor: 'rgba(75,160,195,0.06)' }}>
-        <p className="text-xs font-medium mb-2 text-center" style={{ color: 'var(--color-ink)' }}>
-          Computing C[{step.i}][{step.j}] = Σ A[{step.i},k] × B[k,{step.j}]
-        </p>
-        <div className="flex justify-center items-center gap-2 mb-3">
-          <div className="text-center">
-            <p className="text-xs mb-1" style={{ color: 'oklch(50% 0.12 235)' }}>Row {step.i}</p>
-            <div className="flex gap-1">
-              {step.products.map((p, idx) => (
-                <div key={idx} style={{
-                  width: 36,
-                  height: 36,
-                  backgroundColor: 'rgba(80,130,200,0.15)',
-                  borderRadius: '0.5rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: '0.875rem',
-                  fontWeight: 700,
-                  color: 'oklch(50% 0.12 235)',
-                }}>
-                  {p.aVal.toFixed(1)}
-                </div>
-              ))}
-            </div>
-          </div>
-          <span className="text-xl font-bold" style={{ color: 'var(--color-muted)' }}>×</span>
-          <div className="text-center">
-            <p className="text-xs mb-1" style={{ color: 'oklch(65% 0.10 70)' }}>Col {step.j}</p>
-            <div className="flex gap-1 flex-col">
-              {step.products.map((p, idx) => (
-                <div key={idx} style={{
-                  width: 36,
-                  height: 36,
-                  backgroundColor: 'rgba(200,155,50,0.15)',
-                  borderRadius: '0.5rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: '0.875rem',
-                  fontWeight: 700,
-                  color: 'oklch(65% 0.10 70)',
-                }}>
-                  {p.bVal.toFixed(1)}
-                </div>
-              ))}
-            </div>
-          </div>
-          <span className="text-xl font-bold" style={{ color: 'var(--color-muted)' }}>=</span>
-          <div style={{
-            width: 48,
-            height: 48,
-            backgroundColor: 'var(--color-accent)',
-            color: 'var(--color-paper)',
-            borderRadius: '0.5rem',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontFamily: 'var(--font-mono)',
-            fontSize: '1rem',
-            fontWeight: 700,
-          }}>
-            {step.sum.toFixed(1)}
-          </div>
-        </div>
-        <p className="text-center text-xs" style={{ color: 'var(--color-muted)' }}>
-          = {step.products.map(p => `(${p.aVal}×${p.bVal})`).join(' + ')} = <span className="font-bold" style={{ color: 'var(--color-accent)' }}>{step.sum.toFixed(2)}</span>
-        </p>
-      </div>
-    );
-  };
+  const tabs = [
+    { key: 'add', label: 'Addition', formula: 'A + B' },
+    { key: 'multiply', label: 'Multiplication', formula: 'A × B' },
+    { key: 'transpose', label: 'Transpose', formula: 'Aᵀ' },
+    { key: 'inverse', label: 'Inverse', formula: 'A⁻¹' },
+  ];
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
@@ -332,103 +239,144 @@ export default function MatrixOpsModule() {
           borderColor: 'var(--color-rule)',
         }}
       >
-        <div className="flex items-center gap-2 flex-wrap">
-          <Button
-            variant={operation === 'add' ? 'primary' : 'ghost'}
-            size="sm"
-            icon={Plus}
-            onClick={() => setOperation('add')}
+        {/* Zoom controls */}
+        <div className="flex items-center gap-1">
+          <button onClick={zoomOut}
+            className="p-1.5 rounded-lg transition-all duration-150"
+            style={{ color: 'var(--color-muted)', backgroundColor: 'transparent' }}
+            onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-paper-2)'}
+            onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+            title="Zoom Out">
+            <ZoomOut className="w-4 h-4" />
+          </button>
+
+          <div
+            className="px-2 py-0.5 rounded-lg text-xs font-semibold min-w-[48px] text-center"
+            style={{
+              backgroundColor: 'var(--color-paper-2)',
+              color: 'var(--color-ink)',
+              fontFamily: 'var(--font-mono)'
+            }}
           >
-            Add
-          </Button>
-          <Button
-            variant={operation === 'subtract' ? 'primary' : 'ghost'}
-            size="sm"
-            icon={Minus}
-            onClick={() => setOperation('subtract')}
-          >
-            Subtract
-          </Button>
-          <Button
-            variant={operation === 'multiply' ? 'primary' : 'ghost'}
-            size="sm"
-            icon={X}
-            onClick={() => setOperation('multiply')}
-          >
-            Multiply
-          </Button>
-          <Button
-            variant={operation === 'transpose' ? 'primary' : 'ghost'}
-            size="sm"
-            icon={RotateCcw}
-            onClick={() => setOperation('transpose')}
-          >
-            Transpose
-          </Button>
-          <Button
-            variant={operation === 'inverse' ? 'primary' : 'ghost'}
-            size="sm"
-            icon={Calculator}
-            onClick={() => setOperation('inverse')}
-            disabled={!canInverse}
-            title={!canInverse ? 'Matrix must have non-zero determinant' : ''}
-          >
-            Inverse
-          </Button>
+            {zoom}px
+          </div>
+
+          <button onClick={zoomIn}
+            className="p-1.5 rounded-lg transition-all duration-150"
+            style={{ color: 'var(--color-muted)', backgroundColor: 'transparent' }}
+            onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-paper-2)'}
+            onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+            title="Zoom In">
+            <ZoomIn className="w-4 h-4" />
+          </button>
+
+          <button onClick={() => setPan({ x: 0, y: 0 })}
+            className="p-1.5 rounded-lg transition-all duration-150"
+            style={{ color: 'var(--color-muted)', backgroundColor: 'transparent' }}
+            onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-paper-2)'}
+            onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+            title="Reset Position">
+            <Move className="w-4 h-4" />
+          </button>
         </div>
 
-        <div className="flex-1" />
-
-        <div className="flex items-center gap-2">
-          <Button
-            variant={showGuided ? 'primary' : 'ghost'}
-            size="sm"
-            icon={Info}
-            onClick={() => setShowGuided(!showGuided)}
-          >
-            Learn
-          </Button>
-          <Button
-            variant={showGame ? 'primary' : 'ghost'}
-            size="sm"
-            icon={Gamepad2}
-            onClick={() => setShowGame(!showGame)}
-          >
-            Mini-Game
-          </Button>
+        {/* Tab buttons */}
+        <div className="flex-1 flex justify-center">
+          <div className="flex gap-1 p-1 rounded-xl" style={{ backgroundColor: 'var(--color-paper-3)' }}>
+            {tabs.map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => {
+                  setActiveOp(tab.key);
+                  setCurrentStep(0);
+                  setHighlightCell(null);
+                  setHighlightRow(null);
+                  setHighlightCol(null);
+                }}
+                className="px-4 py-1.5 rounded-lg text-xs font-semibold transition-all"
+                style={
+                  activeOp === tab.key
+                    ? { backgroundColor: 'var(--color-accent)', color: 'var(--color-paper)' }
+                    : { backgroundColor: 'transparent', color: 'var(--color-ink-2)' }
+                }
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
+
+        {/* Toggle buttons */}
+        <div className="flex items-center gap-1.5">
+          <button onClick={() => setLearnMode(!learnMode)}
+            className="px-3 py-1 text-xs font-semibold rounded-lg border transition-all duration-150"
+            style={learnMode
+              ? { backgroundColor: 'var(--color-accent)', color: 'var(--color-paper)', borderColor: 'var(--color-accent)' }
+              : { backgroundColor: 'var(--color-paper)', color: 'var(--color-ink-2)', borderColor: 'var(--color-rule)' }
+            }
+          >
+            {learnMode ? '✓ ' : ''}Learn
+          </button>
+        </div>
+
+        <button onClick={resetAll}
+          className="p-1.5 rounded-lg transition-all duration-150"
+          style={{ color: 'var(--color-muted)', backgroundColor: 'transparent' }}
+          onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-paper-2)'}
+          onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+          title="Reset All">
+          <RotateCcw className="w-4 h-4" />
+        </button>
       </div>
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
         {/* Guided Learning Card */}
-        {showGuided && (
+        {learnMode && (
           <div
             className="px-4 py-2.5 border-b flex-shrink-0"
             style={{
-              background: 'linear-gradient(to right, rgba(75,150,200,0.06), rgba(75,200,150,0.06))',
+              background: 'linear-gradient(to right, rgba(139,92,246,0.06), rgba(236,72,153,0.06))',
               borderColor: 'var(--color-rule)',
             }}
           >
             <div className="flex items-center gap-3 max-w-full">
               <div className="flex items-center gap-1.5 flex-shrink-0">
-                <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold"
-                  style={{ backgroundColor: 'var(--color-accent)', color: 'var(--color-paper)', fontFamily: 'var(--font-mono)' }}>
+                <div
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold"
+                  style={{
+                    backgroundColor: 'var(--color-accent)',
+                    color: 'var(--color-paper)',
+                    fontFamily: 'var(--font-mono)',
+                  }}
+                >
                   {currentStep + 1}
                 </div>
                 <span className="text-xs font-semibold" style={{ color: 'var(--color-muted)', fontFamily: 'var(--font-mono)' }}>
                   / {steps.length}
                 </span>
               </div>
+
               <div className="w-px h-8 flex-shrink-0" style={{ backgroundColor: 'var(--color-rule)' }} />
+
               <div className="flex-1 min-w-0 overflow-hidden">
-                <h3 className="text-sm font-bold mb-0.5 truncate" style={{ color: 'var(--color-ink)', fontFamily: 'var(--font-display)' }}>
+                <h3
+                  className="text-sm font-bold mb-0.5 truncate"
+                  style={{
+                    color: 'var(--color-ink)',
+                    fontFamily: 'var(--font-display)',
+                  }}
+                >
                   {steps[currentStep].title}
                 </h3>
-                <p className="text-xs leading-relaxed" style={{ color: 'var(--color-muted)' }}>
+                <p
+                  className="text-xs leading-relaxed"
+                  style={{ color: 'var(--color-muted)', whiteSpace: 'pre-line' }}
+                >
                   {steps[currentStep].concept}
                 </p>
               </div>
+
               <div className="flex items-center gap-1.5 flex-shrink-0">
                 <button
                   onClick={() => setCurrentStep(Math.max(0, currentStep - 1))}
@@ -442,6 +390,7 @@ export default function MatrixOpsModule() {
                 >
                   ←
                 </button>
+
                 <div className="flex items-center gap-1">
                   {steps.map((_, i) => (
                     <button
@@ -457,6 +406,7 @@ export default function MatrixOpsModule() {
                     />
                   ))}
                 </div>
+
                 <button
                   onClick={() => setCurrentStep(Math.min(steps.length - 1, currentStep + 1))}
                   className="px-2.5 py-1 rounded-lg text-xs font-semibold transition-all"
@@ -474,343 +424,408 @@ export default function MatrixOpsModule() {
           </div>
         )}
 
-        {/* Main Content Area */}
+        {/* Canvas + Right Panel */}
         <div className="flex-1 flex min-h-0 overflow-hidden">
-          {/* Left Panel */}
-          <div className="flex-1 p-4 overflow-y-auto">
-            {showGame ? (
-              <GameWrapper
-                title="Fill the Product"
-                instructions="Given matrices A and B, calculate C = A × B"
-                maxAttempts={5}
-                rounds={5}
-                scoring="accuracy"
-                showTimer={true}
-                timerDuration={30}
+          {/* Main Canvas area */}
+          <div className="flex-1 min-h-0 min-w-0 relative">
+            <div
+              ref={canvasRef}
+              className="w-full h-full"
+              style={{
+                backgroundColor: 'var(--color-paper)',
+                touchAction: 'none',
+              }}
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              onMouseLeave={handleMouseUp}
+            >
+              <MatrixGrid
+                matrixA={matrixA}
+                matrixB={matrixB}
+                operation={activeOp}
+                highlightCell={highlightCell}
+                highlightRow={highlightRow}
+                highlightCol={highlightCol}
+                animProgress={animProgress}
+                showGeometry={showGeometry}
+                zoom={zoom}
+                pan={pan}
+              />
+            </div>
+
+            {/* Operation indicator */}
+            <div
+              className="absolute top-3 left-3 px-3 py-1.5 rounded-lg"
+              style={{
+                backgroundColor: 'color-mix(in oklch, var(--color-paper) 88%, transparent)',
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
+                border: '1px solid var(--color-rule)',
+                boxShadow: 'var(--shadow-md)',
+              }}
+            >
+              <span className="text-sm font-semibold" style={{ color: 'var(--color-ink)' }}>
+                {tabs.find(t => t.key === activeOp)?.label}
+              </span>
+            </div>
+
+            {/* Gauss-Jordan steps for inverse */}
+            {activeOp === 'inverse' && gaussSteps.length > 0 && (
+              <div
+                className="absolute bottom-3 left-3 right-3 p-3 rounded-xl max-h-48 overflow-y-auto"
+                style={{
+                  backgroundColor: 'color-mix(in oklch, var(--color-paper) 92%, transparent)',
+                  backdropFilter: 'blur(12px)',
+                  WebkitBackdropFilter: 'blur(12px)',
+                  border: '1px solid var(--color-rule)',
+                  boxShadow: 'var(--shadow-md)',
+                }}
               >
-                {(props) => <FillTheProduct {...props} />}
-              </GameWrapper>
-            ) : (
-              <>
-                {/* Matrices Display */}
-                <div className="flex flex-wrap justify-center items-start gap-4 mb-4">
-                  {operation === 'inverse' ? (
-                    <div className="flex flex-col items-center gap-4">
-                      <MatrixGrid
-                        matrix={matrixA}
-                        onChange={(i, j, v) => updateMatrixCell(matrixA, setMatrixA, i, j, v)}
-                        editable={true}
-                        label="A"
-                      />
-                      <p className="text-xs" style={{ color: 'var(--color-accent)' }}>Click to edit</p>
-                    </div>
-                  ) : (
-                    <>
-                      <MatrixGrid
-                        matrix={matrixA}
-                        onChange={(i, j, v) => updateMatrixCell(matrixA, setMatrixA, i, j, v)}
-                        editable={true}
-                        label="A"
-                      />
-                      <div className="flex flex-col items-center justify-center gap-4">
-                        <span className="text-3xl font-bold" style={{ color: 'var(--color-muted)' }}>
-                          {operation === 'add' ? '+' : operation === 'subtract' ? '−' : operation === 'multiply' ? '×' : operation === 'transpose' ? 'ᵀ' : '⁻¹'}
-                        </span>
-                        {operation === 'transpose' && (
-                          <p className="text-xs" style={{ color: 'var(--color-accent)' }}>A → Aᵀ</p>
-                        )}
-                        {operation === 'inverse' && (
-                          <p className="text-xs" style={{ color: 'var(--color-accent)' }}>A → A⁻¹</p>
-                        )}
-                      </div>
-                      <MatrixGrid
-                        matrix={matrixB}
-                        onChange={(i, j, v) => updateMatrixCell(matrixB, setMatrixB, i, j, v)}
-                        editable={operation !== 'inverse' && operation !== 'transpose'}
-                        label="B"
-                      />
-                    </>
-                  )}
-                  <div className="flex flex-col items-center justify-center">
-                    <span className="text-4xl font-bold" style={{ color: 'var(--color-muted)' }}>=</span>
-                  </div>
-                  <div
-                    className="rounded-xl p-4"
-                    style={{
-                      backgroundColor: 'rgba(75,160,195,0.08)',
-                      border: '1.5px solid var(--color-accent)',
-                    }}
-                  >
-                    <MatrixGrid
-                      matrix={resultMatrix || [[0, 0], [0, 0]]}
-                      editable={false}
-                      label="C"
-                    />
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-semibold" style={{ color: 'var(--color-ink)' }}>
+                    Gauss-Jordan Reduction
+                  </span>
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => setGaussCurrentStep(Math.max(0, gaussCurrentStep - 1))}
+                      className="px-2 py-0.5 text-xs rounded"
+                      style={{ backgroundColor: 'var(--color-paper-2)', color: 'var(--color-ink)' }}
+                      disabled={gaussCurrentStep <= 0}
+                    >
+                      ←
+                    </button>
+                    <span className="text-xs px-2 py-0.5 font-mono" style={{ color: 'var(--color-muted)' }}>
+                      {gaussCurrentStep + 1}/{gaussSteps.length}
+                    </span>
+                    <button
+                      onClick={() => setGaussCurrentStep(Math.min(gaussSteps.length - 1, gaussCurrentStep + 1))}
+                      className="px-2 py-0.5 text-xs rounded"
+                      style={{ backgroundColor: 'var(--color-paper-2)', color: 'var(--color-ink)' }}
+                      disabled={gaussCurrentStep >= gaussSteps.length - 1}
+                    >
+                      →
+                    </button>
                   </div>
                 </div>
-
-                {/* Animation for Multiply */}
-                {operation === 'multiply' && multiplySteps.length > 0 && (
-                  <div className="mb-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="font-semibold text-sm" style={{ color: 'var(--color-ink-2)' }}>Step Through</h4>
-                      <div className="flex gap-2">
-                        <Button variant="ghost" size="xs" onClick={resetAnimation}>Reset</Button>
-                        <Button variant="ghost" size="xs" icon={isAnimating ? Pause : Play} onClick={isAnimating ? pauseAnimation : playAnimation}>
-                          {isAnimating ? 'Pause' : 'Play'}
-                        </Button>
-                        <Button variant="ghost" size="xs" icon={SkipForward} onClick={stepForward} disabled={animationStep >= multiplySteps.length - 1}>
-                          Step
-                        </Button>
-                      </div>
+                {gaussSteps.slice(0, gaussCurrentStep + 1).map((step, idx) => (
+                  <div
+                    key={idx}
+                    className="p-2 rounded-lg mb-1 text-xs font-mono"
+                    style={{
+                      backgroundColor: idx === gaussCurrentStep ? 'rgba(139,92,246,0.15)' : 'var(--color-paper)',
+                      border: `1px solid ${idx === gaussCurrentStep ? 'rgba(139,92,246,0.3)' : 'var(--color-rule)'}`,
+                      color: 'var(--color-ink)',
+                    }}
+                  >
+                    <div className="grid grid-cols-2 gap-1 mb-1">
+                      <div>[{step.matrix[0].slice(0, 2).map(n => n.toFixed(2)).join(', ')}]</div>
+                      <div>[{step.matrix[0].slice(2).map(n => n.toFixed(2)).join(', ')}]</div>
+                      <div>[{step.matrix[1].slice(0, 2).map(n => n.toFixed(2)).join(', ')}]</div>
+                      <div>[{step.matrix[1].slice(2).map(n => n.toFixed(2)).join(', ')}]</div>
                     </div>
-                    {animationStep >= 0 && animationStep < multiplySteps.length ? (
-                      <div>
-                        <DotProductAnimation step={multiplySteps[animationStep]} />
-                        <div className="flex justify-center gap-2 mt-4">
-                          {multiplySteps.map((_, idx) => (
-                            <button
-                              key={idx}
-                              onClick={() => setAnimationStep(idx)}
-                              className="w-3 h-3 rounded-full transition-all"
-                              style={{
-                                backgroundColor: idx === animationStep ? 'var(--color-accent)' : idx < animationStep ? 'rgba(75,160,195,0.5)' : 'var(--color-rule)',
-                                transform: idx === animationStep ? 'scale(1.25)' : 'scale(1)',
-                              }}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="text-sm text-center py-4" style={{ color: 'var(--color-muted)' }}>
-                        Press Play or click Step to see how matrix multiplication works
-                      </p>
-                    )}
+                    <div style={{ color: 'var(--color-muted)' }}>{step.operation}</div>
                   </div>
-                )}
-
-                {/* Animation for Inverse */}
-                {operation === 'inverse' && inverseSteps.length > 0 && (
-                  <div className="mb-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="font-semibold text-sm" style={{ color: 'var(--color-ink-2)' }}>Gaussian Elimination</h4>
-                      <div className="flex gap-2">
-                        <Button variant="ghost" size="xs" onClick={resetAnimation}>Reset</Button>
-                        <Button variant="ghost" size="xs" icon={isAnimating ? Pause : Play} onClick={isAnimating ? pauseAnimation : playAnimation}>
-                          {isAnimating ? 'Pause' : 'Play'}
-                        </Button>
-                        <Button variant="ghost" size="xs" icon={SkipForward} onClick={stepForward} disabled={animationStep >= inverseSteps.length - 1}>
-                          Step
-                        </Button>
-                      </div>
-                    </div>
-                    {inverseSteps.map((step, idx) => (
-                      <motion.div
-                        key={idx}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{
-                          opacity: animationStep >= idx ? 1 : 0.3,
-                          x: 0,
-                        }}
-                        className="p-3 rounded-lg mb-2 cursor-pointer"
-                        style={idx === animationStep
-                          ? { backgroundColor: 'rgba(80,130,200,0.10)', border: '1.5px solid oklch(50% 0.12 235)' }
-                          : { backgroundColor: 'var(--color-paper-2)' }}
-                        onClick={() => setAnimationStep(idx)}
-                      >
-                        <p className="text-xs font-medium mb-2" style={{ color: 'oklch(50% 0.12 235)' }}>
-                          Step {idx + 1}: {step.description}
-                        </p>
-                        <div className="flex justify-center">
-                          <div className="flex gap-1">
-                            <div className="grid gap-1">
-                              {step.matrix.map((row, i) => (
-                                <div key={`left-${i}`} className="flex gap-1">
-                                  {row.slice(0, 2).map((val, j) => (
-                                    <div key={j} style={{
-                                      width: 44,
-                                      height: 44,
-                                      backgroundColor: 'rgba(200,155,50,0.10)',
-                                      border: `1.5px solid oklch(65% 0.10 70)`,
-                                      borderRadius: '0.5rem',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      fontFamily: 'var(--font-mono)',
-                                      fontSize: '0.875rem',
-                                      color: 'var(--color-ink)',
-                                    }}>
-                                      {typeof val === 'number' ? val.toFixed(2) : val}
-                                    </div>
-                                  ))}
-                                </div>
-                              ))}
-                            </div>
-                            <div className="flex items-center px-1">
-                              <span className="text-xl font-bold" style={{ color: 'var(--color-muted)' }}>|</span>
-                            </div>
-                            <div className="grid gap-1">
-                              {step.matrix.map((row, i) => (
-                                <div key={`right-${i}`} className="flex gap-1">
-                                  {row.slice(2).map((val, j) => (
-                                    <div key={j} style={{
-                                      width: 44,
-                                      height: 44,
-                                      backgroundColor: 'rgba(75,160,195,0.08)',
-                                      border: `1.5px solid var(--color-accent)`,
-                                      borderRadius: '0.5rem',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      fontFamily: 'var(--font-mono)',
-                                      fontSize: '0.875rem',
-                                      color: 'var(--color-ink)',
-                                    }}>
-                                      {typeof val === 'number' ? val.toFixed(2) : val}
-                                    </div>
-                                  ))}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      </motion.div>
-                    ))}
-                  </div>
-                )}
-
-                {!canInverse && operation === 'inverse' && (
-                  <div className="rounded-xl p-4" style={{ backgroundColor: 'rgba(200,155,50,0.08)', border: '1px solid oklch(65% 0.10 70)' }}>
-                    <p className="text-sm text-center" style={{ color: 'oklch(65% 0.10 70)' }}>
-                      Matrix is singular (determinant = 0). Inverse does not exist.
-                    </p>
-                  </div>
-                )}
-              </>
+                ))}
+              </div>
             )}
           </div>
 
           {/* Right Panel */}
           <div
-            className="w-64 lg:w-72 xl:w-80 flex-shrink-0 min-h-0 overflow-y-auto border-l"
+            className="w-64 lg:w-72 xl:w-80 flex-shrink-0 min-h-0 overflow-y-auto overflow-x-hidden border-l"
             style={{
               backgroundColor: 'var(--color-paper)',
               borderColor: 'var(--color-rule)',
             }}
           >
             <div className="p-3 space-y-3">
-              {/* Formula Reference */}
-              <div className="p-3 rounded-xl" style={{ backgroundColor: 'var(--color-paper-2)' }}>
-                <div className="text-xs font-medium mb-2" style={{ color: 'var(--color-neutral)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
-                  Formulas
+              {/* Matrix A */}
+              <div
+                className="p-3 rounded-xl"
+                style={{ backgroundColor: 'var(--color-paper-2)' }}
+              >
+                <div className="font-semibold mb-2 text-xs" style={{ color: 'var(--color-neutral)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                  Matrix A
                 </div>
-                {operation === 'add' && (
-                  <div className="space-y-2">
-                    <div className="p-2 rounded-lg" style={{ backgroundColor: 'var(--color-paper)' }}>
-                      <code className="text-xs font-mono" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-ink)' }}>
-                        C[i][j] = A[i][j] + B[i][j]
-                      </code>
-                    </div>
-                    <p className="text-xs" style={{ color: 'var(--color-muted)' }}>
-                      Add corresponding elements
-                    </p>
+                <div className="grid grid-cols-2 gap-1">
+                  {matrixA.map((row, i) =>
+                    row.map((val, j) => (
+                      <input
+                        key={`a-${i}-${j}`}
+                        type="number"
+                        step="0.1"
+                        value={val.toFixed(2)}
+                        onChange={(e) => {
+                          const newVal = parseFloat(e.target.value) || 0;
+                          setMatrixA(prev => {
+                            const newA = prev.map(r => [...r]);
+                            newA[i][j] = newVal;
+                            return newA;
+                          });
+                        }}
+                        className="px-2 py-1.5 text-sm text-center rounded-lg font-mono outline-none"
+                        style={{
+                          backgroundColor: 'var(--color-paper)',
+                          border: '1px solid var(--color-rule)',
+                          color: 'var(--color-ink)',
+                        }}
+                      />
+                    ))
+                  )}
+                </div>
+                <div className="text-xs text-center mt-2" style={{ color: 'var(--color-muted)' }}>
+                  det(A) = {detA.toFixed(3)}
+                  <span
+                    className="ml-2 px-1.5 py-0.5 rounded text-xs"
+                    style={{
+                      backgroundColor: isSingularA ? 'rgba(220,53,69,0.15)' : 'rgba(126,211,33,0.15)',
+                      color: isSingularA ? '#DC3749' : '#7ED321',
+                    }}
+                  >
+                    {isSingularA ? 'singular' : 'invertible'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Matrix B */}
+              <div
+                className="p-3 rounded-xl"
+                style={{ backgroundColor: 'var(--color-paper-2)' }}
+              >
+                <div className="font-semibold mb-2 text-xs" style={{ color: 'var(--color-neutral)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                  Matrix B
+                </div>
+                <div className="grid grid-cols-2 gap-1">
+                  {matrixB.map((row, i) =>
+                    row.map((val, j) => (
+                      <input
+                        key={`b-${i}-${j}`}
+                        type="number"
+                        step="0.1"
+                        value={val.toFixed(2)}
+                        onChange={(e) => {
+                          const newVal = parseFloat(e.target.value) || 0;
+                          setMatrixB(prev => {
+                            const newB = prev.map(r => [...r]);
+                            newB[i][j] = newVal;
+                            return newB;
+                          });
+                        }}
+                        className="px-2 py-1.5 text-sm text-center rounded-lg font-mono outline-none"
+                        style={{
+                          backgroundColor: 'var(--color-paper)',
+                          border: '1px solid var(--color-rule)',
+                          color: 'var(--color-ink)',
+                        }}
+                      />
+                    ))
+                  )}
+                </div>
+                <div className="text-xs text-center mt-2" style={{ color: 'var(--color-muted)' }}>
+                  det(B) = {detB.toFixed(3)}
+                  <span
+                    className="ml-2 px-1.5 py-0.5 rounded text-xs"
+                    style={{
+                      backgroundColor: isSingularB ? 'rgba(220,53,69,0.15)' : 'rgba(126,211,33,0.15)',
+                      color: isSingularB ? '#DC3749' : '#7ED321',
+                    }}
+                  >
+                    {isSingularB ? 'singular' : 'invertible'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Operation Result */}
+              <div
+                className="p-3 rounded-xl"
+                style={{ backgroundColor: 'var(--color-paper-2)' }}
+              >
+                <div className="font-semibold mb-2 text-xs" style={{ color: 'var(--color-neutral)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                  {activeOp === 'add' ? 'A + B' : activeOp === 'multiply' ? 'A × B' : activeOp === 'transpose' ? 'Aᵀ' : 'A⁻¹'}
+                </div>
+
+                {(activeOp === 'add' || activeOp === 'multiply') && resultMatrix && (
+                  <div
+                    className="text-center py-3 rounded-xl font-mono font-bold"
+                    style={{
+                      backgroundColor: 'rgba(139,92,246,0.15)',
+                      color: '#8B5CF6',
+                      border: '2px solid rgba(139,92,246,0.3)',
+                    }}
+                  >
+                    <div>[{resultMatrix[0][0].toFixed(2)}, {resultMatrix[0][1].toFixed(2)}]</div>
+                    <div>[{resultMatrix[1][0].toFixed(2)}, {resultMatrix[1][1].toFixed(2)}]</div>
                   </div>
                 )}
-                {operation === 'subtract' && (
-                  <div className="space-y-2">
-                    <div className="p-2 rounded-lg" style={{ backgroundColor: 'var(--color-paper)' }}>
-                      <code className="text-xs font-mono" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-ink)' }}>
-                        C[i][j] = A[i][j] - B[i][j]
-                      </code>
-                    </div>
-                    <p className="text-xs" style={{ color: 'var(--color-muted)' }}>
-                      Subtract corresponding elements
-                    </p>
+
+                {activeOp === 'transpose' && (
+                  <div
+                    className="text-center py-3 rounded-xl font-mono font-bold"
+                    style={{
+                      backgroundColor: 'rgba(245,158,11,0.15)',
+                      color: '#F59E0B',
+                      border: '2px solid rgba(245,158,11,0.3)',
+                    }}
+                  >
+                    <div>[{transposeA[0][0].toFixed(2)}, {transposeA[0][1].toFixed(2)}]</div>
+                    <div>[{transposeA[1][0].toFixed(2)}, {transposeA[1][1].toFixed(2)}]</div>
                   </div>
                 )}
-                {operation === 'multiply' && (
-                  <div className="space-y-2">
-                    <div className="p-2 rounded-lg" style={{ backgroundColor: 'var(--color-paper)' }}>
-                      <code className="text-xs font-mono" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-ink)' }}>
-                        C[i][j] = Σₖ A[i][k] × B[k][j]
-                      </code>
-                    </div>
-                    <p className="text-xs" style={{ color: 'var(--color-muted)' }}>
-                      Row-by-column dot products
-                    </p>
-                  </div>
-                )}
-                {operation === 'transpose' && (
-                  <div className="space-y-2">
-                    <div className="p-2 rounded-lg" style={{ backgroundColor: 'var(--color-paper)' }}>
-                      <code className="text-xs font-mono" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-ink)' }}>
-                        (A^T)[i][j] = A[j][i]
-                      </code>
-                    </div>
-                    <p className="text-xs" style={{ color: 'var(--color-muted)' }}>
-                      Flip rows and columns
-                    </p>
-                  </div>
-                )}
-                {operation === 'inverse' && (
-                  <div className="space-y-2">
-                    <div className="p-2 rounded-lg" style={{ backgroundColor: 'var(--color-paper)' }}>
-                      <code className="text-xs font-mono" style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-ink)' }}>
-                        A⁻¹ = 1/det(A) × [d, -b; -c, a]
-                      </code>
-                    </div>
-                    <p className="text-xs" style={{ color: 'var(--color-muted)' }}>
-                      A × A⁻¹ = I (for det ≠ 0)
-                    </p>
+
+                {activeOp === 'inverse' && (
+                  <div>
+                    {isSingularA ? (
+                      <div
+                        className="text-center py-3 rounded-xl font-semibold"
+                        style={{
+                          backgroundColor: 'rgba(220,53,69,0.15)',
+                          color: '#DC3749',
+                          border: '2px solid rgba(220,53,69,0.3)',
+                        }}
+                      >
+                        No inverse exists
+                        <div className="text-xs mt-1 font-mono" style={{ fontWeight: 'normal' }}>
+                          det(A) = 0
+                        </div>
+                      </div>
+                    ) : inverseA && (
+                      <div
+                        className="text-center py-3 rounded-xl font-mono font-bold"
+                        style={{
+                          backgroundColor: 'rgba(16,185,129,0.15)',
+                          color: '#10B981',
+                          border: '2px solid rgba(16,185,129,0.3)',
+                        }}
+                      >
+                        <div>[{inverseA[0][0].toFixed(3)}, {inverseA[0][1].toFixed(3)}]</div>
+                        <div>[{inverseA[1][0].toFixed(3)}, {inverseA[1][1].toFixed(3)}]</div>
+                        <div className="text-xs mt-2 pt-2 border-t font-normal" style={{ borderColor: 'rgba(16,185,129,0.2)', color: 'var(--color-muted)' }}>
+                          A · A⁻¹ = I ✓
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
 
-              {/* Hint */}
-              {showGuided && (
-                <div className="p-3 rounded-xl" style={{ backgroundColor: 'rgba(200,155,50,0.08)', border: '1px solid oklch(65% 0.10 70)' }}>
-                  <div className="text-xs font-medium mb-1" style={{ color: 'oklch(65% 0.10 70)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                    Hint
+              {/* Operation-specific info */}
+              {activeOp === 'multiply' && (
+                <div
+                  className="p-3 rounded-xl"
+                  style={{ backgroundColor: 'var(--color-paper-2)' }}
+                >
+                  <div className="font-semibold mb-2 text-xs" style={{ color: 'var(--color-neutral)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                    Determinant Property
                   </div>
-                  <p className="text-xs" style={{ color: 'oklch(65% 0.10 70)' }}>
-                    {steps[currentStep].hint}
-                  </p>
+                  <div className="text-xs font-mono p-2 rounded-lg" style={{ backgroundColor: 'var(--color-paper)', color: 'var(--color-muted)' }}>
+                    det(AB) = det(A) · det(B)
+                  </div>
+                  <div className="text-center mt-2">
+                    <span className="text-sm font-mono font-semibold" style={{ color: 'var(--color-ink)' }}>
+                      {detA.toFixed(2)} × {detB.toFixed(2)} = {(detA * detB).toFixed(2)}
+                    </span>
+                  </div>
+                  {resultMatrix && (
+                    <div className="text-center mt-1">
+                      <span className="text-xs" style={{ color: 'var(--color-muted)' }}>
+                        det(AB) = {det2x2(resultMatrix).toFixed(2)}
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
 
-              {/* Operation Reference */}
-              <div className="p-3 rounded-xl" style={{ backgroundColor: 'var(--color-paper-2)' }}>
-                <div className="text-xs font-medium mb-2" style={{ color: 'var(--color-neutral)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
-                  Operation
+              {activeOp === 'multiply' && highlightCell && (
+                <div
+                  className="p-3 rounded-xl"
+                  style={{ backgroundColor: 'var(--color-paper-2)' }}
+                >
+                  <div className="font-semibold mb-2 text-xs" style={{ color: 'var(--color-neutral)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                    Current Cell
+                  </div>
+                  <div className="text-xs font-mono p-2 rounded-lg" style={{ backgroundColor: 'var(--color-paper)', color: 'var(--color-ink)' }}>
+                    C[{highlightCell.row}][{highlightCell.col}] =
+                  </div>
+                  <div className="text-center mt-2">
+                    <div className="text-xs" style={{ color: '#4A90E2' }}>
+                      row {highlightCell.row} of A: [{matrixA[highlightCell.row][0].toFixed(1)}, {matrixA[highlightCell.row][1].toFixed(1)}]
+                    </div>
+                    <div className="text-xs my-1" style={{ color: 'var(--color-muted)' }}>·</div>
+                    <div className="text-xs" style={{ color: '#7ED321' }}>
+                      col {highlightCell.col} of B: [{matrixB[0][highlightCell.col].toFixed(1)}, {matrixB[1][highlightCell.col].toFixed(1)}]
+                    </div>
+                  </div>
+                  <div className="text-center mt-2 font-mono font-bold" style={{ color: '#8B5CF6' }}>
+                    = {resultMatrix?.[highlightCell.row]?.[highlightCell.col].toFixed(2) || '—'}
+                  </div>
                 </div>
-                <div className="text-lg font-bold" style={{ color: 'var(--color-accent)', fontFamily: 'var(--font-display)' }}>
-                  {operation.charAt(0).toUpperCase() + operation.slice(1)}
+              )}
+
+              {activeOp === 'transpose' && (
+                <div
+                  className="p-3 rounded-xl"
+                  style={{ backgroundColor: 'var(--color-paper-2)' }}
+                >
+                  <div className="font-semibold mb-2 text-xs" style={{ color: 'var(--color-neutral)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                    Transpose Properties
+                  </div>
+                  <div className="space-y-2 text-xs font-mono">
+                    <div className="p-2 rounded-lg" style={{ backgroundColor: 'var(--color-paper)', color: 'var(--color-muted)' }}>
+                      (Aᵀ)ᵀ = A ✓
+                    </div>
+                    <div className="p-2 rounded-lg" style={{ backgroundColor: 'var(--color-paper)', color: 'var(--color-muted)' }}>
+                      (AB)ᵀ = BᵀAᵀ ✓
+                    </div>
+                    <div className="p-2 rounded-lg" style={{ backgroundColor: 'var(--color-paper)', color: 'var(--color-muted)' }}>
+                      (A + B)ᵀ = Aᵀ + Bᵀ ✓
+                    </div>
+                  </div>
                 </div>
-                <p className="text-xs mt-1" style={{ color: 'var(--color-muted)' }}>
-                  {steps.findIndex(s => s.title.toLowerCase().startsWith(operation)) >= 0
-                    ? steps[steps.findIndex(s => s.title.toLowerCase().startsWith(operation))].action
-                    : 'Try different operations'}
-                </p>
-              </div>
+              )}
+
+              {activeOp === 'inverse' && !isSingularA && (
+                <div
+                  className="p-3 rounded-xl"
+                  style={{ backgroundColor: 'var(--color-paper-2)' }}
+                >
+                  <div className="font-semibold mb-2 text-xs" style={{ color: 'var(--color-neutral)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                    Inverse Formula
+                  </div>
+                  <div className="text-xs font-mono p-2 rounded-lg" style={{ backgroundColor: 'var(--color-paper)', color: 'var(--color-muted)' }}>
+                    A⁻¹ = (1/det) × adjugate
+                  </div>
+                  <div className="text-xs font-mono p-2 rounded-lg mt-2" style={{ backgroundColor: 'var(--color-paper)', color: 'var(--color-ink)' }}>
+                    adj(A) = [[d, -b], [-c, a]]
+                  </div>
+                  <div className="text-xs text-center mt-2">
+                    <span className="font-semibold" style={{ color: '#10B981' }}>
+                      (1/{detA.toFixed(3)}) × adj(A)
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Footer */}
-        <div
-          className="px-4 py-2 flex items-center justify-center gap-4 border-t flex-shrink-0"
-          style={{
-            backgroundColor: 'var(--color-paper)',
-            borderColor: 'var(--color-rule)',
-            color: 'var(--color-muted)',
-          }}
-        >
-          <span className="text-xs">
-            {showGuided && steps[currentStep] ? `Action: ${steps[currentStep].action}` : 'Try different operations'}
-          </span>
-          <span>•</span>
-          <CompletionToggle moduleId={3} />
-        </div>
+      {/* Bottom hint bar */}
+      <div
+        className="px-4 py-1.5 text-xs flex items-center justify-center gap-3 border-t flex-shrink-0"
+        style={{
+          backgroundColor: 'var(--color-paper-2)',
+          borderColor: 'var(--color-rule)',
+          color: 'var(--color-muted)',
+        }}
+      >
+        <span>Click tabs to switch operations</span>
+        <span>·</span>
+        <span>Edit matrix values above</span>
+        <span>·</span>
+        <span>Alt+drag to pan</span>
+        <span>·</span>
+        <span>det(AB) = det(A)·det(B)</span>
       </div>
     </div>
   );

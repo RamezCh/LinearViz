@@ -5,8 +5,10 @@ import Scene3D, { Scene3DOverlay, Scene3DLabel } from './Scene3D';
 import Parallelogram from './Parallelogram';
 import ParallelogramEdge from './ParallelogramEdge';
 import AngleArc from './AngleArc';
+import TransformGrid from './TransformGrid';
+import MatrixGrid from './MatrixGrid';
 
-export { CanvasWrapper, useCanvasContext, Grid2D, GridOverlay, Vector2D, Scene3D, Scene3DOverlay, Scene3DLabel, Parallelogram, ParallelogramEdge, AngleArc };
+export { CanvasWrapper, useCanvasContext, Grid2D, GridOverlay, Vector2D, Scene3D, Scene3DOverlay, Scene3DLabel, Parallelogram, ParallelogramEdge, AngleArc, TransformGrid, MatrixGrid };
 
 export const Canvas = {
   Wrapper: CanvasWrapper,
@@ -19,6 +21,8 @@ export const Canvas = {
   Parallelogram: Parallelogram,
   ParallelogramEdge: ParallelogramEdge,
   AngleArc: AngleArc,
+  TransformGrid: TransformGrid,
+  MatrixGrid: MatrixGrid,
 };
 
 export default {
@@ -29,4 +33,6 @@ export default {
   Parallelogram,
   ParallelogramEdge,
   AngleArc,
+  TransformGrid,
+  MatrixGrid,
 };
