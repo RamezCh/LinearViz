@@ -4,6 +4,7 @@ import { Gamepad2 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import CompletionToggle from '../../components/UI/CompletionToggle';
 import { Button } from '../../components/UI/Button';
+import { InlineText } from '../../components/UI/Math';
 import { det2x2 } from '../../utils/linalg';
 import GameWrapper from '../../components/MiniGame/GameWrapper';
 import AreaMatch from '../../games/AreaMatch';
@@ -96,23 +97,23 @@ export default function DeterminantsModule() {
   const steps = [
     {
       title: 'Determinant as Signed Area',
-      concept: `The parallelogram area formed by vectors u = [${vectorU.x.toFixed(1)}, ${vectorU.y.toFixed(1)}] and v = [${vectorV.x.toFixed(1)}, ${vectorV.y.toFixed(1)}] equals |det| = ${area.toFixed(2)}. The sign tells us about orientation!`,
+      concept: `The parallelogram area formed by vectors $\\mathbf{u} = \\begin{pmatrix}${vectorU.x.toFixed(1)} \\\\ ${vectorU.y.toFixed(1)}\\end{pmatrix}$ and $\\mathbf{v} = \\begin{pmatrix}${vectorV.x.toFixed(1)} \\\\ ${vectorV.y.toFixed(1)}\\end{pmatrix}$ equals $|det| = ${area.toFixed(2)}$. The sign tells us about orientation!`,
       hint: 'Drag the vectors to change the parallelogram. Watch det change!',
       action: 'Drag the vectors to explore',
     },
     {
       title: 'The Formula',
-      concept: `For a 2×2 matrix, det = a×d - b×c. Here: det = ${vectorU.x.toFixed(1)}×${vectorV.y.toFixed(1)} - ${vectorU.y.toFixed(1)}×${vectorV.x.toFixed(1)} = ${determinant.toFixed(2)}`,
+      concept: `For a 2×2 matrix, $\\det = a \\times d - b \\times c$. Here: $\\det = ${vectorU.x.toFixed(1)} \\times ${vectorV.y.toFixed(1)} - ${vectorU.y.toFixed(1)} \\times ${vectorV.x.toFixed(1)} = ${determinant.toFixed(2)}$`,
       hint: 'The diagonal products minus the off-diagonal products.',
       action: 'Look at the formula panel for details',
     },
 {
       title: 'When det = 0: Linear Dependence',
-      concept: `If det = 0, the vectors are parallel and lie on the same line. This is called "LINEAR DEPENDENCE."
+      concept: `If $\\det = 0$, the vectors are parallel and lie on the same line. This is called "LINEAR DEPENDENCE."
 
 What does this mean?
 • Two vectors are linearly dependent if one can be made by scaling the other
-• If u = 2×v or v = 0.5×u, they're dependent
+• If $\\mathbf{u} = 2\\mathbf{v}$ or $\\mathbf{v} = 0.5\\mathbf{u}$, they're dependent
 • Geometrically: they point in the same (or exactly opposite) direction
 
 Why care?
@@ -125,18 +126,18 @@ Why care?
     {
       title: 'Sign Matters: Orientation',
       concept: isPositive
-        ? `Your vectors form a PARALLELOGRAM with det = ${determinant.toFixed(2)} > 0
+        ? `Your vectors form a PARALLELOGRAM with $\\det = ${determinant.toFixed(2)} > 0$
 
 What does this mean?
 • The parallelogram is counterclockwise (right-handed)
 • Imagine your right hand: thumb = u, index = v
 • If your palm faces you, it's right-handed
-• det > 0 means the orientation is PRESERVED (no flip)`
-        : `Your vectors form a PARALLELOGRAM with det = ${determinant.toFixed(2)} < 0
+• $\\det > 0$ means the orientation is PRESERVED (no flip)`
+        : `Your vectors form a PARALLELOGRAM with $\\det = ${determinant.toFixed(2)} < 0$
 
 What does this mean?
 • The parallelogram is clockwise (left-handed)
-• det < 0 means the orientation is FLIPPED
+• $\\det < 0$ means the orientation is FLIPPED
 • Like a mirror reflection!`,
       hint: 'Try negative vectors or swap u and v!',
       action: 'Check the parallelogram orientation and hand-ness',
@@ -144,8 +145,8 @@ What does this mean?
     {
       title: 'Sign Matters',
       concept: isPositive
-        ? `Positive det = ${determinant.toFixed(2)}: The orientation is preserved (counterclockwise from u to v). The parallelogram is "right-handed".`
-        : `Negative det = ${determinant.toFixed(2)}: The orientation is flipped (clockwise from u to v). The parallelogram is "left-handed".`,
+        ? `Positive $\\det = ${determinant.toFixed(2)}$: The orientation is preserved (counterclockwise from u to v). The parallelogram is "right-handed".`
+        : `Negative $\\det = ${determinant.toFixed(2)}$: The orientation is flipped (clockwise from u to v). The parallelogram is "left-handed".`,
       hint: 'The color of the parallelogram indicates the sign.',
       action: 'Check the parallelogram color',
     },
@@ -276,7 +277,7 @@ What does this mean?
                 {steps[currentStep].title}
               </h3>
               <p className="text-xs leading-relaxed" style={{ color: 'var(--color-muted)' }}>
-                {steps[currentStep].concept}
+                <InlineText text={steps[currentStep].concept} />
               </p>
             </div>
             <div className="flex items-center gap-1.5 flex-shrink-0">

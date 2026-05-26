@@ -5,6 +5,7 @@ import { svd2x2 } from '../../utils/linalg';
 import { useStore } from '../../store/useStore';
 import CompletionToggle from '../../components/UI/CompletionToggle';
 import { Button } from '../../components/UI/Button';
+import { InlineText } from '../../components/UI/Math';
 
 const ACCENT = 'var(--color-accent)';
 const ACCENT_RGB = '75,160,195';
@@ -261,7 +262,7 @@ export default function SVDModule() {
                 {steps[currentStep].title}
               </h3>
               <p className="text-xs leading-relaxed" style={{ color: 'var(--color-muted)' }}>
-                {steps[currentStep].concept}
+                <InlineText text={steps[currentStep].concept} />
               </p>
             </div>
             <div className="flex items-center gap-1.5 flex-shrink-0">

@@ -5,6 +5,7 @@ import { Button } from '../../components/UI/Button';
 import { Card } from '../../components/UI/Card';
 import { useStore } from '../../store/useStore';
 import CompletionToggle from '../../components/UI/CompletionToggle';
+import { InlineText } from '../../components/UI/Math';
 import { magnitude, add, scalarMultiply } from '../../utils/linalg';
 
 const VECTOR_COLORS = {
@@ -143,7 +144,7 @@ export default function VectorSpacesModule() {
                 {steps[currentStep].title}
               </h3>
               <p className="text-xs leading-relaxed" style={{ color: 'var(--color-muted)' }}>
-                {steps[currentStep].concept}
+                <InlineText text={steps[currentStep].concept} />
               </p>
             </div>
             <div className="flex items-center gap-1.5 flex-shrink-0">

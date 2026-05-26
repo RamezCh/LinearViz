@@ -5,6 +5,7 @@ import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { Plus, Trash2, ZoomIn, ZoomOut, RotateCcw, Move, Edit3, Check, X } from 'lucide-react';
 import CompletionToggle from '../../components/UI/CompletionToggle';
 import { magnitude, dotProduct, angleBetween } from '../../utils/linalg';
+import { InlineText } from '../../components/UI/Math';
 
 const MIN_ZOOM = 0.3;
 const MAX_ZOOM = 3;
@@ -206,49 +207,49 @@ export default function VectorsModule() {
     },
     {
       title: 'Where is the origin?',
-      concept: 'Every vector starts at the origin (0, 0) — where the two bold axes cross. The center marker shows you where (0, 0) is on the grid.',
+      concept: 'Every vector starts at the origin $(0, 0)$ — where the two bold axes cross. The center marker shows you where $(0, 0)$ is on the grid.',
       hint: 'Look for the accent-colored circle at the center.',
       action: 'Find the origin marker at 0, 0',
     },
     {
       title: 'Vector coordinates',
-      concept: `A vector is written as [x, y] where x is how far right and y is how far up. The vector ${selectedVec?.name || v1?.name || 'a'} = [${selectedVec?.coords[0].toFixed(1) || 0}, ${selectedVec?.coords[1].toFixed(1) || 0}] goes ${Math.abs(selectedVec?.coords[0] || 0).toFixed(0)} steps ${(selectedVec?.coords[0] || 0) >= 0 ? 'right' : 'left'} and ${Math.abs(selectedVec?.coords[1] || 0).toFixed(0)} steps ${(selectedVec?.coords[1] || 0) >= 0 ? 'up' : 'down'} from the origin.`,
+      concept: `A vector is written as $\\begin{pmatrix} x \\\\ y \\end{pmatrix}$ where x is how far right and y is how far up. The vector $${selectedVec?.name || v1?.name || 'a'} = \\begin{pmatrix} ${selectedVec?.coords[0].toFixed(1) || 0} \\\\ ${selectedVec?.coords[1].toFixed(1) || 0} \\end{pmatrix}$ goes ${Math.abs(selectedVec?.coords[0] || 0).toFixed(0)} steps ${(selectedVec?.coords[0] || 0) >= 0 ? 'right' : 'left'} and ${Math.abs(selectedVec?.coords[1] || 0).toFixed(0)} steps ${(selectedVec?.coords[1] || 0) >= 0 ? 'up' : 'down'} from the origin.`,
       hint: 'Select a vector in the legend overlay to see its coordinates.',
       action: 'Select a vector and read its coordinates',
     },
     {
       title: 'What is magnitude?',
-      concept: `The magnitude |${v1?.name || 'a'}| = √(${v1?.coords[0].toFixed(1) || 0}² + ${v1?.coords[1].toFixed(1) || 0}²) ≈ ${mag1.toFixed(1)} is the length of the arrow — the straight-line distance from the origin to the tip. We use the Pythagorean theorem: √(x² + y²).`,
+      concept: `The magnitude $\\|${v1?.name || 'a'}\\| = \\sqrt{${v1?.coords[0].toFixed(1) || 0}^2 + ${v1?.coords[1].toFixed(1) || 0}^2} \\approx ${mag1.toFixed(1)}$ is the length of the arrow — the straight-line distance from the origin to the tip.`,
       hint: 'The sidebar shows |a| = magnitude for the selected vector.',
       action: 'Read the magnitude in the right sidebar',
     },
     {
       title: 'What is vector addition?',
-      concept: `Adding vectors places them tip-to-tail: ${v1?.name || 'a'} + ${v2?.name || 'b'} = [${v1?.coords[0].toFixed(1) || 0} + ${v2?.coords[0].toFixed(1) || 0}, ${v1?.coords[1].toFixed(1) || 0} + ${v2?.coords[1].toFixed(1) || 0}] = [${sumVec?.coords[0].toFixed(1) || 0}, ${sumVec?.coords[1].toFixed(1) || 0}]. The purple arrow (Σ) shows their sum.`,
+      concept: `Adding vectors places them tip-to-tail: $${v1?.name || 'a'} + ${v2?.name || 'b'} = \\begin{pmatrix} ${(v1?.coords[0] || 0) + (v2?.coords[0] || 0)} \\\\ ${(v1?.coords[1] || 0) + (v2?.coords[1] || 0)} \\end{pmatrix}$. The purple arrow $(\\Sigma)$ shows their sum.`,
       hint: 'The purple Σ arrow is the sum. The dashed parallelogram shows how tip-to-tail addition works geometrically.',
       action: 'Watch how a + b forms the purple sum arrow',
     },
     {
       title: 'What is the dot product?',
-      concept: `${v1?.name || 'a'} · ${v2?.name || 'b'} = ${v1?.coords[0].toFixed(1) || 0} × ${v2?.coords[0].toFixed(1) || 0} + ${v1?.coords[1].toFixed(1) || 0} × ${v2?.coords[1].toFixed(1) || 0} = ${dotProd.toFixed(2)}. Multiply matching coordinates and add: [x₁×x₂] + [y₁×y₂].`,
+      concept: `$${v1?.name || 'a'} \\cdot ${v2?.name || 'b'} = ${(v1?.coords[0] || 0).toFixed(1)} \\times ${(v2?.coords[0] || 0).toFixed(1)} + ${(v1?.coords[1] || 0).toFixed(1)} \\times ${(v2?.coords[1] || 0).toFixed(1)} = ${dotProd.toFixed(2)}$. Multiply matching coordinates and add!`,
       hint: 'The sidebar shows the full dot product calculation with the component breakdown.',
       action: 'Find the dot product calculation in the right sidebar',
     },
     {
       title: 'What does the dot product tell us?',
-      concept: `${v1?.name || 'a'} · ${v2?.name || 'b'} = |${v1?.name || 'a'}| × |${v2?.name || 'b'}| × cos(θ) = ${mag1.toFixed(1)} × ${mag2.toFixed(1)} × cos(${angle.toFixed(0)}°) = ${dotProd.toFixed(2)}. The dot product measures how much the vectors point in the SAME direction.`,
+      concept: `$${v1?.name || 'a'} \\cdot ${v2?.name || 'b'} = \\|${v1?.name || 'a'}\\| \\times \\|${v2?.name || 'b'}\\| \\times \\cos(\\theta) = ${mag1.toFixed(1)} \\times ${mag2.toFixed(1)} \\times \\cos(${angle.toFixed(0)}^\\circ) = ${dotProd.toFixed(2)}$. The dot product measures how much vectors point in the SAME direction.`,
       hint: 'Drag a vector to see the angle change. Watch the dot product sign change.',
       action: 'Drag vectors to see angle affect dot product sign',
     },
     {
       title: 'Angle interpretation',
-      concept: `• Positive: acute angle (<90°) — similar direction\n• Zero: perpendicular (90°) — no overlap\n• Negative: obtuse (>90°) — opposite directions\n• Geometrically: projection of one vector onto another multiplied by the other's length.`,
+      concept: `• Positive: acute angle $(<90^\\circ)$ — similar direction\n• Zero: perpendicular $(90^\\circ)$ — no overlap\n• Negative: obtuse $(>90^\\circ)$ — opposite directions\n• Geometrically: projection of one vector onto another.`,
       hint: 'Watch the indicator in the right panel change as you move vectors.',
       action: 'Check the dot product indicator in the sidebar',
     },
     {
       title: 'Explore freely',
-      concept: `You have ${vectors.length} vector${vectors.length > 1 ? 's' : ''}: ${vectors.map(v => `${v.name}=[${v.coords[0]},${v.coords[1]}]`).join(', ')}. Add more, rename them, or watch how they sum together. Experiment!`,
+      concept: `You have ${vectors.length} vector${vectors.length > 1 ? 's' : ''}: ${vectors.map(v => `${v.name}=\\begin{pmatrix}${v.coords[0]},${v.coords[1]}\\end{pmatrix}`).join(', ')}. Add more, rename them, or watch how they sum together. Experiment!`,
       hint: 'Click + to add a vector, or click a vector name to select and rename it.',
       action: 'Add a third vector with the + button',
     },
@@ -765,7 +766,7 @@ export default function VectorsModule() {
                   className="text-xs leading-relaxed"
                   style={{ color: 'var(--color-muted)', whiteSpace: 'pre-line' }}
                 >
-                  {steps[currentStep].concept}
+                  <InlineText text={steps[currentStep].concept} />
                 </p>
               </div>
 
@@ -1136,7 +1137,7 @@ export default function VectorsModule() {
                   <div className="text-xs mb-2.5" style={{ color: 'var(--color-muted)' }}>
                     Add matching coordinates across all active vectors:
                   </div>
-                  <div className="space-y-1.5 font-mono text-xs" style={{ color: 'var(--color-muted)', fontFamily: 'var(--font-mono)' }}>
+                  <div className="space-y-2 font-mono text-xs" style={{ color: 'var(--color-muted)', fontFamily: 'var(--font-mono)' }}>
                     <div className="flex items-center gap-1 flex-wrap">
                       {activeSumVectors.map((v, i) => (
                         <span key={v.id}>
@@ -1146,11 +1147,9 @@ export default function VectorsModule() {
                       ))}
                     </div>
                     <div className="text-center" style={{ color: 'var(--color-rule-2)' }}>=</div>
-                    <div className="leading-relaxed">
-                      [{activeSumVectors.map(v => v.coords[0].toFixed(1)).join(' + ')},
-                      <br />
-                      &nbsp;{activeSumVectors.map(v => v.coords[1].toFixed(1)).join(' + ')}]
-                    </div>
+                    <InlineText
+                      text={`\\begin{pmatrix} ${activeSumVectors.map(v => v.coords[0].toFixed(1)).join(' + ')} \\\\ ${activeSumVectors.map(v => v.coords[1].toFixed(1)).join(' + ')} \\end{pmatrix}`}
+                    />
                     <div className="text-center" style={{ color: 'var(--color-rule-2)' }}>=</div>
                     <div
                       className="font-bold text-center py-1.5 rounded-xl"
@@ -1160,14 +1159,14 @@ export default function VectorsModule() {
                         fontFamily: 'var(--font-mono)',
                       }}
                     >
-                      [{sumVec?.coords[0].toFixed(2)}, {sumVec?.coords[1].toFixed(2)}]
+                      <InlineText text={`\\begin{pmatrix}${sumVec?.coords[0].toFixed(2)},${sumVec?.coords[1].toFixed(2)}\\end{pmatrix}`} />
                     </div>
                     {sumVec && (
                       <div
-                        className="text-xs pt-1.5 mt-1.5 border-t"
+                        className="text-xs pt-1.5 mt-1.5 border-t text-center"
                         style={{ color: 'var(--color-muted)', borderColor: 'var(--color-rule)', fontFamily: 'var(--font-mono)' }}
                       >
-                        |Σ| = √({(sumVec.coords[0] ** 2 + sumVec.coords[1] ** 2).toFixed(2)}) = {magnitude(sumVec.coords).toFixed(3)}
+                        <InlineText text={`\\|\\Sigma\\| = \\sqrt{${(sumVec.coords[0] ** 2 + sumVec.coords[1] ** 2).toFixed(2)}} = ${magnitude(sumVec.coords).toFixed(3)}`} />
                       </div>
                     )}
                   </div>
@@ -1181,11 +1180,11 @@ export default function VectorsModule() {
                     Dot Product
                   </div>
                   <div className="text-xs mb-2" style={{ color: 'var(--color-muted)' }}>
-                    a · b = x₁×x₂ + y₁×y₂
+                    <InlineText text={`\\mathbf{a} \\cdot \\mathbf{b} = x_1 \\times x_2 + y_1 \\times y_2`} />
                   </div>
                   <div className="space-y-1.5 font-mono text-xs" style={{ fontFamily: 'var(--font-mono)' }}>
-                    <div style={{ color: 'var(--color-muted)' }}>{v1.name} · {v2.name}</div>
-                    <div style={{ color: 'var(--color-muted)' }}>{v1.coords[0].toFixed(2)} × {v2.coords[0].toFixed(2)} + {v1.coords[1].toFixed(2)} × {v2.coords[1].toFixed(2)}</div>
+                    <div style={{ color: 'var(--color-muted)' }}><InlineText text={`${v1.name} \\cdot ${v2.name}`} /></div>
+                    <div style={{ color: 'var(--color-muted)' }}><InlineText text={`${v1.coords[0].toFixed(2)} \\times ${v2.coords[0].toFixed(2)} + ${v1.coords[1].toFixed(2)} \\times ${v2.coords[1].toFixed(2)}`} /></div>
                     <div
                       className="font-bold text-center py-1.5 rounded-xl"
                       style={{
@@ -1194,11 +1193,10 @@ export default function VectorsModule() {
                         fontFamily: 'var(--font-mono)',
                       }}
                     >
-                      = {dotProd.toFixed(3)}
+                      <InlineText text={`= ${dotProd.toFixed(3)}`} />
                     </div>
                     <div className="text-xs pt-1.5 mt-1.5 border-t" style={{ color: 'var(--color-muted)', borderColor: 'var(--color-rule)', fontFamily: 'var(--font-mono)' }}>
-                      <div>= |{v1.name}| × |{v2.name}| × cos(θ)</div>
-                      <div>= {mag1.toFixed(2)} × {mag2.toFixed(2)} × cos({angle.toFixed(0)}°)</div>
+                      <InlineText text={`\\|${v1.name}\\| \\times \\|${v2.name}\\| \\times \\cos(\\theta) = ${mag1.toFixed(2)} \\times ${mag2.toFixed(2)} \\times \\cos(${angle.toFixed(0)}^\\circ)`} />
                     </div>
                     {dotProd < 0 ? (
                       <div className="text-xs p-1.5 rounded-lg" style={{ backgroundColor: 'rgba(200,155,50,0.15)', color: 'oklch(65% 0.08 70)' }}>
@@ -1232,27 +1230,27 @@ export default function VectorsModule() {
                         <div className="space-y-2 text-xs" style={{ color: 'var(--color-muted)' }}>
                           <div className="p-2 rounded" style={{ backgroundColor: 'var(--color-paper-2)' }}>
                             <div className="font-semibold mb-1" style={{ color: v1.color }}>{v1.name}</div>
-                            <div>Vector: [{v1.coords[0].toFixed(1)}, {v1.coords[1].toFixed(1)}]</div>
-                            <div>|{v1.name}| = {mag1.toFixed(2)} (length)</div>
+                            <InlineText text={`\\mathbf{v}_1 = \\begin{pmatrix}${v1.coords[0].toFixed(1)} \\\\ ${v1.coords[1].toFixed(1)}\\end{pmatrix}`} />
+                            <div><InlineText text={`\\|${v1.name}\\| = ${mag1.toFixed(2)}`} /></div>
                           </div>
                           <div className="p-2 rounded" style={{ backgroundColor: 'var(--color-paper-2)' }}>
                             <div className="font-semibold mb-1" style={{ color: v2.color }}>{v2.name}</div>
-                            <div>|{v2.name}| = {mag2.toFixed(2)} (length)</div>
-                            <div>|{v1.name}|cos(θ) = projection of {v1.name} onto {v2.name}</div>
+                            <InlineText text={`\\mathbf{v}_2 = \\begin{pmatrix}${v2.coords[0].toFixed(1)} \\\\ ${v2.coords[1].toFixed(1)}\\end{pmatrix}`} />
+                            <div><InlineText text={`\\|${v2.name}\\| = ${mag2.toFixed(2)}`} /></div>
+                            <div><InlineText text={`\\|${v1.name}\\|\\cos(\\theta) = \\text{proj}_{\\mathbf{v}_2}(\\mathbf{v}_1)`} /></div>
                           </div>
                           <div className="p-2 rounded border" style={{ borderColor: 'var(--color-sum)', backgroundColor: 'rgba(88,0,150,0.05)' }}>
                             <div className="font-semibold mb-1" style={{ color: 'var(--color-sum)' }}>Geometric Formula</div>
-                            <div>{v1.name} · {v2.name} = |{v1.name}| × |{v2.name}| × cos(θ)</div>
-                            <div>= {mag1.toFixed(2)} × {mag2.toFixed(2)} × cos({angle.toFixed(0)}°)</div>
+                            <InlineText text={`${v1.name} \\cdot ${v2.name} = \\|${v1.name}\\| \\times \\|${v2.name}\\| \\times \\cos(\\theta) = ${mag1.toFixed(2)} \\times ${mag2.toFixed(2)} \\times \\cos(${angle.toFixed(0)}^\\circ)`} />
                             <div className="font-semibold mt-1" style={{ color: 'var(--color-sum)' }}>
-                              = {dotProd.toFixed(3)}
+                              <InlineText text={`= ${dotProd.toFixed(3)}`} />
                             </div>
                           </div>
                           <div className="p-2 rounded" style={{ backgroundColor: 'var(--color-paper-2)' }}>
                             <div className="font-semibold mb-1">Interpretation</div>
                             <div>The dot product = <strong>how much {v1.name} overlaps with {v2.name}</strong></div>
-                            <div>If you project {v1.name} onto {v2.name}, the length is |{v1.name}|cos(θ)</div>
-                            <div>Multiplying by |{v2.name}| gives the total overlap</div>
+                            <InlineText text={`\\text{proj}_{\\mathbf{v}_2}(\\mathbf{v}_1) = \\|${v1.name}\\|\\cos(\\theta)`} />
+                            <div>Multiplying by <InlineText text={`\\|${v2.name}\\|`} /> gives the total overlap</div>
                           </div>
                         </div>
                       </div>

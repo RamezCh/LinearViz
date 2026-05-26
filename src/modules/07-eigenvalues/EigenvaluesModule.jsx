@@ -5,6 +5,7 @@ import { Button } from '../../components/UI/Button';
 import { useStore } from '../../store/useStore';
 import CompletionToggle from '../../components/UI/CompletionToggle';
 import { Card } from '../../components/UI/Card';
+import { InlineText } from '../../components/UI/Math';
 import { eigenvalues2x2, eigenvectors2x2, det2x2 } from '../../utils/linalg';
 
 function applyTransformation(v, A) {
@@ -14,12 +15,12 @@ function applyTransformation(v, A) {
 const steps = [
   {
     title: 'What are Eigenvalues?',
-    concept: `An EIGENVALUE λ and its EIGENVECTOR v have a special relationship:
-  A × v = λ × v
+    concept: `An EIGENVALUE $\\lambda$ and its EIGENVECTOR $\\mathbf{v}$ have a special relationship:
+$A \\times \\mathbf{v} = \\lambda \\times \\mathbf{v}$
 
-Translation: When matrix A transforms eigenvector v, the result stays in the SAME DIRECTION as v — it only stretches or squishes!
+Translation: When matrix A transforms eigenvector $\\mathbf{v}$, the result stays in the SAME DIRECTION as $\\mathbf{v}$ — it only stretches or squishes!
 
-Example: If v = [1, 0] is an eigenvector with λ = 2, then A×[1,0] = 2×[1,0] = [2, 0]
+Example: If $\\mathbf{v} = \\begin{pmatrix}1 \\\\ 0\\end{pmatrix}$ is an eigenvector with $\\lambda = 2$, then $A \\times [1,0] = 2 \\times [1,0] = [2, 0]$
 
 The eigenvector doesn't change direction — just length!`,
     hint: 'The AMBER lines show eigenvector directions. Vectors ON these lines stay on them after transformation.',
@@ -29,38 +30,38 @@ The eigenvector doesn't change direction — just length!`,
     title: 'The Characteristic Equation',
     concept: `How do we FIND eigenvalues?
 
-Step 1: Start with A × v = λ × v
-Step 2: Rearrange to (A - λI) × v = 0
-Step 3: For non-zero v, we need det(A - λI) = 0
+Step 1: Start with $A \\times \\mathbf{v} = \\lambda \\times \\mathbf{v}$
+Step 2: Rearrange to $(A - \\lambda I) \\times \\mathbf{v} = 0$
+Step 3: For non-zero $\\mathbf{v}$, we need $\\det(A - \\lambda I) = 0$
 
-This is the CHARACTERISTIC EQUATION — solve for λ!
+This is the CHARACTERISTIC EQUATION — solve for $\\lambda$!
 
-For 2×2: det(A - λI) = 0 gives a quadratic in λ`,
+For 2×2: $\\det(A - \\lambda I) = 0$ gives a quadratic in $\\lambda$`,
     hint: 'Click "Compute Eigenvalues" button to see step-by-step.',
     action: 'Click the Compute button to see derivation',
   },
   {
     title: 'Trace and Determinant Relationship',
     concept: `For 2×2 matrices, eigenvalues have special properties:
-• λ₁ + λ₂ = TRACE(A) = a + d (sum of diagonal)
-• λ₁ × λ₂ = DET(A)
+• $\\lambda_1 + \\lambda_2 = \\text{TRACE}(A) = a + d$ (sum of diagonal)
+• $\\lambda_1 \\times \\lambda_2 = \\text{DET}(A)$
 
 These shortcuts let you CHECK your answers!
 
 For your matrix:
-  tr(A) = ${trace.toFixed(2)}
-  det(A) = ${determinant.toFixed(2)}`,
+$\\text{tr}(A) = ${trace.toFixed(2)}$
+$\\det(A) = ${determinant.toFixed(2)}$`,
     hint: 'The right panel shows tr(A) = ' + trace.toFixed(2) + ' and det(A) = ' + determinant.toFixed(2) + '.',
     action: 'Check the Matrix Info panel for trace and det',
   },
   {
     title: 'What Do Eigenvalues Tell Us?',
-    concept: `Your eigenvalues: λ₁ = ${eigenvalues?.[0]?.value?.toFixed(2) || '?'}, λ₂ = ${eigenvalues?.[1]?.value?.toFixed(2) || '?'}
+    concept: `Your eigenvalues: $\\lambda_1 = ${eigenvalues?.[0]?.value?.toFixed(2) || '?'}$, $\\lambda_2 = ${eigenvalues?.[1]?.value?.toFixed(2) || '?'}$
 
-• |λ| > 1: Stretches in that direction
-• |λ| < 1: Squishes in that direction
-• λ < 0: Includes a flip (reflection)
-• λ = 1 or -1: Just rotates or reflects
+• $|\\lambda| > 1$: Stretches in that direction
+• $|\\lambda| < 1$: Squishes in that direction
+• $\\lambda < 0$: Includes a flip (reflection)
+• $\\lambda = 1$ or $-1$: Just rotates or reflects
 
 The AMBER vectors show the eigenvector directions on the canvas!`,
     hint: 'Drag vectors on the amber lines — they stay on their lines after transformation.',
@@ -68,14 +69,14 @@ The AMBER vectors show the eigenvector directions on the canvas!`,
   },
   {
     title: 'Complex Eigenvalues',
-    concept: `If discriminant (tr² - 4×det) < 0, we get COMPLEX eigenvalues.
+    concept: `If discriminant $(tr^2 - 4 \\times \\det) < 0$, we get COMPLEX eigenvalues.
 
 This means the transformation includes ROTATION — no real eigenvector lines exist!
 
-Example: Rotation by 90° ([0, -1; 1, 0])
+Example: Rotation by $90^\\circ$ $\\begin{pmatrix}0 & -1 \\\\ 1 & 0\\end{pmatrix}$
 • Every vector rotates!
 • No vector stays on its line
-• Eigenvalues = i and -i (complex!)`,
+• Eigenvalues $= i$ and $-i$ (complex!)`,
     hint: 'Try a rotation matrix: a=0, b=-1, c=1, d=0 → complex eigenvalues.',
     action: 'Try rotation matrix [0, -1, 1, 0]',
   },
@@ -225,7 +226,7 @@ export default function EigenvaluesModule() {
                 {steps[currentStep].title}
               </h3>
               <p className="text-xs leading-relaxed" style={{ color: 'var(--color-muted)' }}>
-                {steps[currentStep].concept}
+                <InlineText text={steps[currentStep].concept} />
               </p>
             </div>
             <div className="flex items-center gap-1.5 flex-shrink-0">

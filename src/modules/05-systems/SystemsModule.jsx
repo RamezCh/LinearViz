@@ -4,6 +4,7 @@ import { AlertCircle, Infinity, Check, Gamepad2 } from 'lucide-react';
 import { Button } from '../../components/UI/Button';
 import { useStore } from '../../store/useStore';
 import CompletionToggle from '../../components/UI/CompletionToggle';
+import { InlineText } from '../../components/UI/Math';
 import GameWrapper from '../../components/MiniGame/GameWrapper';
 import SolveTheSystem from '../../games/SolveTheSystem';
 
@@ -179,7 +180,7 @@ Or use Gaussian elimination!`,
                 {steps[currentStep].title}
               </h3>
               <p className="text-xs leading-relaxed" style={{ color: 'var(--color-muted)' }}>
-                {steps[currentStep].concept}
+                <InlineText text={steps[currentStep].concept} />
               </p>
             </div>
             <div className="flex items-center gap-1.5 flex-shrink-0">

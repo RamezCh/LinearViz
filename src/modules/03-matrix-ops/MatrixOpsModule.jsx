@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { ZoomIn, ZoomOut, RotateCcw, Move } from 'lucide-react';
 import MatrixGrid from '../../components/Canvas/MatrixGrid';
+import { InlineText } from '../../components/UI/Math';
 import {
   det2x2, transpose, inverse2x2, multiply, add, subtract, rowReduce
 } from '../../utils/linalg';
@@ -373,7 +374,7 @@ export default function MatrixOpsModule() {
                   className="text-xs leading-relaxed"
                   style={{ color: 'var(--color-muted)', whiteSpace: 'pre-line' }}
                 >
-                  {steps[currentStep].concept}
+                  <InlineText text={steps[currentStep].concept} />
                 </p>
               </div>
 
