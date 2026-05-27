@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronRight, CheckCircle2, Circle, Lock, X, Link2 } from 'lucide-react';
+import { ChevronRight, CheckCircle2, Circle, Lock, X, Link2, ChevronLeft } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { modules } from '../../data/modules';
 
 export function Sidebar({ onShowBridge }) {
-  const { currentModule, setCurrentModule, sidebarCollapsed, isModuleUnlocked, moduleProgress } = useStore();
+  const { currentModule, setCurrentModule, sidebarCollapsed, toggleSidebar, isModuleUnlocked, moduleProgress } = useStore();
   const [isMobile, setIsMobile] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -124,7 +124,37 @@ export function Sidebar({ onShowBridge }) {
     );
   }
 
-  if (sidebarCollapsed) return null;
+  if (sidebarCollapsed) {
+    return (
+      <div className="w-12 border-r flex-shrink-0 hidden lg:flex flex-col items-center py-3 gap-1"
+        style={{ backgroundColor: 'var(--color-paper)', borderColor: 'var(--color-rule)' }}>
+        <button
+          onClick={toggleSidebar}
+          className="w-8 h-8 rounded-lg flex items-center justify-center mb-2"
+          style={{ backgroundColor: 'var(--color-paper-2)', color: 'var(--color-muted)' }}
+          title="Expand sidebar"
+        >
+          <ChevronRight className="w-4 h-4" />
+        </button>
+        {modules.map((mod) => (
+          <button
+            key={mod.id}
+            onClick={() => handleModuleClick(mod.id)}
+            className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs transition-all"
+            disabled={!isModuleUnlocked(mod.id)}
+            style={{
+              backgroundColor: currentModule === mod.id ? mod.color || 'var(--color-accent)' : 'var(--color-paper-2)',
+              color: currentModule === mod.id ? 'var(--color-paper)' : (isModuleUnlocked(mod.id) ? 'var(--color-ink)' : 'var(--color-muted)'),
+              opacity: isModuleUnlocked(mod.id) ? 1 : 0.5,
+            }}
+            title={mod.title}
+          >
+            {mod.id}
+          </button>
+        ))}
+      </div>
+    );
+  }
 
   return (
     <aside
@@ -132,9 +162,19 @@ export function Sidebar({ onShowBridge }) {
       style={{ backgroundColor: 'var(--color-paper)', borderColor: 'var(--color-rule)' }}
     >
       <div className="p-3 space-y-1.5">
-        <h2 className="text-xs font-semibold mb-2 px-2" style={{ color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-          Modules
-        </h2>
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-xs font-semibold px-2" style={{ color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            Modules
+          </h2>
+          <button
+            onClick={toggleSidebar}
+            className="w-6 h-6 rounded-lg flex items-center justify-center"
+            style={{ color: 'var(--color-muted)' }}
+            title="Collapse sidebar"
+          >
+            <ChevronLeft className="w-3.5 h-3.5" />
+          </button>
+        </div>
         {modules.map((mod) => (
           <button
             key={mod.id}

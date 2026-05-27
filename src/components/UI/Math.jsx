@@ -156,3 +156,26 @@ export function Matrix({ matrix, name = 'M', highlight = null }) {
     />
   );
 }
+
+export function VectorDisplay({ coords, name = 'v', color = null, compact = false }) {
+  if (!coords || coords.length !== 2) return null;
+
+  const x = typeof coords[0] === 'number' ? coords[0].toFixed(compact ? 1 : 2) : coords[0];
+  const y = typeof coords[1] === 'number' ? coords[1].toFixed(compact ? 1 : 2) : coords[1];
+
+  return (
+    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+      {name && (
+        <span style={{ color: color || 'var(--color-ink)', fontWeight: 600, fontSize: compact ? '12px' : '13px', fontFamily: 'var(--font-mono)' }}>{name}</span>
+      )}
+      <span
+        dangerouslySetInnerHTML={{
+          __html: katex.renderToString(
+            `\\left(\\begin{matrix} ${x}\\\\[2pt] ${y} \\end{matrix}\\right)`,
+            { displayMode: false, throwOnError: false }
+          )
+        }}
+      />
+    </div>
+  );
+}

@@ -5,7 +5,9 @@ import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { Plus, Trash2, ZoomIn, ZoomOut, RotateCcw, Move, Edit3, Check, X } from 'lucide-react';
 import CompletionToggle from '../../components/UI/CompletionToggle';
 import { magnitude, dotProduct, angleBetween } from '../../utils/linalg';
-import { InlineText } from '../../components/UI/Math';
+import { InlineText, VectorDisplay } from '../../components/UI/Math';
+import katex from 'katex';
+import 'katex/dist/katex.min.css';
 
 const MIN_ZOOM = 0.3;
 const MAX_ZOOM = 3;
@@ -249,7 +251,7 @@ export default function VectorsModule() {
     },
     {
       title: 'Explore freely',
-      concept: `You have ${vectors.length} vector${vectors.length > 1 ? 's' : ''}: ${vectors.map(v => `${v.name}=\\begin{pmatrix}${v.coords[0]},${v.coords[1]}\\end{pmatrix}`).join(', ')}. Add more, rename them, or watch how they sum together. Experiment!`,
+      concept: `You have ${vectors.length} vector${vectors.length > 1 ? 's' : ''}: ${vectors.map(v => `$${v.name}=\\begin{pmatrix}${v.coords[0]},${v.coords[1]}\\end{pmatrix}$`).join(', ')}. Add more, rename them, or watch how they sum together. Experiment!`,
       hint: 'Click + to add a vector, or click a vector name to select and rename it.',
       action: 'Add a third vector with the + button',
     },
@@ -1023,14 +1025,11 @@ export default function VectorsModule() {
           </div>
 
           {/* Right Panel */}
-          <div
-            className="w-64 lg:w-72 xl:w-80 flex-shrink-0 min-h-0 overflow-y-auto overflow-x-hidden border-l"
-            style={{
-              backgroundColor: 'var(--color-paper)',
-              borderColor: 'var(--color-rule)',
-            }}
-          >
-            <div className="p-3 space-y-3">
+          <div className="relative flex-shrink-0 border-l" style={{ borderColor: 'var(--color-rule)', backgroundColor: 'var(--color-paper)' }}>
+            <div
+              className="w-72 lg:w-80 xl:w-96 min-h-0 overflow-y-auto overflow-x-hidden p-3 space-y-3"
+              style={{ maxHeight: 'calc(100vh - 100px)' }}
+            >
 
               {/* Selected Vector Details */}
               {selectedVec && (
@@ -1128,133 +1127,126 @@ export default function VectorsModule() {
                 </div>
               )}
 
-              {/* Addition */}
+              {/* Vector Addition */}
               {activeSumVectors.length >= 1 && (
                 <div className="p-3 rounded-xl" style={{ backgroundColor: 'var(--color-paper-2)' }}>
-                  <div className="font-semibold mb-1 text-xs" style={{ color: 'var(--color-neutral)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                  <div className="font-semibold mb-3 text-xs" style={{ color: 'var(--color-neutral)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
                     Vector Addition
                   </div>
-                  <div className="text-xs mb-2.5" style={{ color: 'var(--color-muted)' }}>
-                    Add matching coordinates across all active vectors:
-                  </div>
-                  <div className="space-y-2 font-mono text-xs" style={{ color: 'var(--color-muted)', fontFamily: 'var(--font-mono)' }}>
-                    <div className="flex items-center gap-1 flex-wrap">
-                      {activeSumVectors.map((v, i) => (
-                        <span key={v.id}>
-                          {i > 0 && " + "}
-                          <span className="font-bold" style={{ color: v.color }}>{v.name}</span>
-                        </span>
-                      ))}
-                    </div>
-                    <div className="text-center" style={{ color: 'var(--color-rule-2)' }}>=</div>
-                    <InlineText
-                      text={`\\begin{pmatrix} ${activeSumVectors.map(v => v.coords[0].toFixed(1)).join(' + ')} \\\\ ${activeSumVectors.map(v => v.coords[1].toFixed(1)).join(' + ')} \\end{pmatrix}`}
-                    />
-                    <div className="text-center" style={{ color: 'var(--color-rule-2)' }}>=</div>
-                    <div
-                      className="font-bold text-center py-1.5 rounded-xl"
-                      style={{
-                        backgroundColor: 'var(--color-accent)',
-                        color: 'var(--color-paper)',
-                        fontFamily: 'var(--font-mono)',
-                      }}
-                    >
-                      <InlineText text={`\\begin{pmatrix}${sumVec?.coords[0].toFixed(2)},${sumVec?.coords[1].toFixed(2)}\\end{pmatrix}`} />
-                    </div>
-                    {sumVec && (
-                      <div
-                        className="text-xs pt-1.5 mt-1.5 border-t text-center"
-                        style={{ color: 'var(--color-muted)', borderColor: 'var(--color-rule)', fontFamily: 'var(--font-mono)' }}
-                      >
-                        <InlineText text={`\\|\\Sigma\\| = \\sqrt{${(sumVec.coords[0] ** 2 + sumVec.coords[1] ** 2).toFixed(2)}} = ${magnitude(sumVec.coords).toFixed(3)}`} />
+
+                  {/* Vectors displayed side by side with operators */}
+                  <div className="flex items-center justify-center gap-2 mb-3">
+                    {activeSumVectors.map((v, i) => (
+                      <div key={v.id} className="flex items-center gap-2">
+                        {i > 0 && (
+                          <span className="text-lg font-bold" style={{ color: 'var(--color-accent)' }}>+</span>
+                        )}
+                        <div className="px-2 py-1.5 rounded-lg" style={{ backgroundColor: 'var(--color-paper)' }}>
+                          <VectorDisplay coords={v.coords} name={v.name} color={v.color} />
+                        </div>
                       </div>
+                    ))}
+                    {activeSumVectors.length >= 1 && sumVec && (
+                      <>
+                        <span className="text-lg font-bold" style={{ color: 'var(--color-accent)' }}>=</span>
+                        <div className="px-2 py-1.5 rounded-lg" style={{ backgroundColor: 'var(--color-accent)', color: 'var(--color-paper)' }}>
+                          <VectorDisplay coords={sumVec.coords} name="" />
+                        </div>
+                      </>
                     )}
                   </div>
+
+                  {/* Step-by-step calculation */}
+                  <div className="text-center py-2 px-3 rounded-lg" style={{ backgroundColor: 'var(--color-paper)', fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--color-ink)' }}>
+                    <div className="mb-1" style={{ color: 'var(--color-muted)' }}>Add coordinates:</div>
+                    <div>
+                      x: {activeSumVectors.map((v, i) => (
+                        <span key={i}>
+                          {i > 0 && <span style={{ color: 'var(--color-accent)' }}> + </span>}
+                          <span style={{ color: v.color }}>{v.coords[0].toFixed(1)}</span>
+                        </span>
+                      ))} <span>= </span>
+                      <span style={{ fontWeight: 600 }}>{sumVec?.coords[0].toFixed(2)}</span>
+                    </div>
+                    <div>
+                      y: {activeSumVectors.map((v, i) => (
+                        <span key={i}>
+                          {i > 0 && <span style={{ color: 'var(--color-accent)' }}> + </span>}
+                          <span style={{ color: v.color }}>{v.coords[1].toFixed(1)}</span>
+                        </span>
+                      ))} <span>= </span>
+                      <span style={{ fontWeight: 600 }}>{sumVec?.coords[1].toFixed(2)}</span>
+                    </div>
+                  </div>
+
+                  {/* Magnitude */}
+                  {sumVec && (
+                    <div className="text-center text-xs pt-2 border-t" style={{ color: 'var(--color-muted)', borderColor: 'var(--color-rule)' }}>
+                      <span dangerouslySetInnerHTML={{ __html: katex.renderToString(`||\\vec{a}+\\vec{b}|| = ${magnitude(sumVec.coords).toFixed(3)}`, { displayMode: false, throwOnError: false }) }} />
+                    </div>
+                  )}
                 </div>
               )}
 
               {/* Dot Product */}
               {vectors.length >= 2 && v1 && v2 && (
                 <div className="p-3 rounded-xl" style={{ backgroundColor: 'var(--color-paper-2)' }}>
-                  <div className="font-semibold mb-1 text-xs" style={{ color: 'var(--color-neutral)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                  <div className="font-semibold mb-3 text-xs" style={{ color: 'var(--color-neutral)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
                     Dot Product
                   </div>
-                  <div className="text-xs mb-2" style={{ color: 'var(--color-muted)' }}>
-                    <InlineText text={`\\mathbf{a} \\cdot \\mathbf{b} = x_1 \\times x_2 + y_1 \\times y_2`} />
+
+                  {/* Vectors displayed side by side with dot product symbol */}
+                  <div className="flex items-center justify-center gap-2 mb-3">
+                    <div className="px-2 py-1.5 rounded-lg" style={{ backgroundColor: 'var(--color-paper)' }}>
+                      <VectorDisplay coords={v1.coords} name={v1.name} color={v1.color} />
+                    </div>
+                    <span className="text-lg font-bold" style={{ color: 'var(--color-accent)' }}>
+                      <span dangerouslySetInnerHTML={{ __html: katex.renderToString('\\cdot', { displayMode: false, throwOnError: false }) }} />
+                    </span>
+                    <div className="px-2 py-1.5 rounded-lg" style={{ backgroundColor: 'var(--color-paper)' }}>
+                      <VectorDisplay coords={v2.coords} name={v2.name} color={v2.color} />
+                    </div>
+                    <span className="text-lg font-bold" style={{ color: 'var(--color-accent)' }}>=</span>
+                    <div className="px-2 py-1.5 rounded-lg font-mono font-bold" style={{ backgroundColor: 'var(--color-accent)', color: 'var(--color-paper)' }}>
+                      {dotProd.toFixed(3)}
+                    </div>
                   </div>
-                  <div className="space-y-1.5 font-mono text-xs" style={{ fontFamily: 'var(--font-mono)' }}>
-                    <div style={{ color: 'var(--color-muted)' }}><InlineText text={`${v1.name} \\cdot ${v2.name}`} /></div>
-                    <div style={{ color: 'var(--color-muted)' }}><InlineText text={`${v1.coords[0].toFixed(2)} \\times ${v2.coords[0].toFixed(2)} + ${v1.coords[1].toFixed(2)} \\times ${v2.coords[1].toFixed(2)}`} /></div>
-                    <div
-                      className="font-bold text-center py-1.5 rounded-xl"
-                      style={{
-                        backgroundColor: 'var(--color-accent)',
-                        color: 'var(--color-paper)',
-                        fontFamily: 'var(--font-mono)',
-                      }}
-                    >
-                      <InlineText text={`= ${dotProd.toFixed(3)}`} />
+
+                  {/* Step-by-step calculation */}
+                  <div className="text-center py-2 px-3 rounded-lg" style={{ backgroundColor: 'var(--color-paper)', fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--color-ink)' }}>
+                    <div className="mb-1" style={{ color: 'var(--color-muted)' }}>Multiply matching components:</div>
+                    <div className="mb-0.5">
+                      <span style={{ color: v1.color }}>{v1.coords[0].toFixed(1)}</span>
+                      <span style={{ color: 'var(--color-accent)' }}> × </span>
+                      <span style={{ color: v2.color }}>{v2.coords[0].toFixed(1)}</span>
+                      <span> + </span>
+                      <span style={{ color: v1.color }}>{v1.coords[1].toFixed(1)}</span>
+                      <span style={{ color: 'var(--color-accent)' }}> × </span>
+                      <span style={{ color: v2.color }}>{v2.coords[1].toFixed(1)}</span>
                     </div>
-                    <div className="text-xs pt-1.5 mt-1.5 border-t" style={{ color: 'var(--color-muted)', borderColor: 'var(--color-rule)', fontFamily: 'var(--font-mono)' }}>
-                      <InlineText text={`\\|${v1.name}\\| \\times \\|${v2.name}\\| \\times \\cos(\\theta) = ${mag1.toFixed(2)} \\times ${mag2.toFixed(2)} \\times \\cos(${angle.toFixed(0)}^\\circ)`} />
+                    <div style={{ fontWeight: 600 }}>
+                      = a · b = {dotProd.toFixed(3)}
                     </div>
-                    {dotProd < 0 ? (
-                      <div className="text-xs p-1.5 rounded-lg" style={{ backgroundColor: 'rgba(200,155,50,0.15)', color: 'oklch(65% 0.08 70)' }}>
-                        ↓ Obtuse angle (&gt;90°) — vectors point opposite
-                      </div>
-                    ) : Math.abs(dotProd) < 0.001 ? (
-                      <div className="text-xs p-1.5 rounded-lg" style={{ backgroundColor: 'rgba(100,170,195,0.12)', color: 'oklch(52% 0.08 195)' }}>
-                        ⊥ Perpendicular (90°) — no overlap
-                      </div>
-                    ) : (
-                      <div className="text-xs p-1.5 rounded-lg" style={{ backgroundColor: 'rgba(75,180,140,0.12)', color: 'oklch(52% 0.08 155)' }}>
-                        ↑ Acute angle (&lt;90°) — similar direction
-                      </div>
-                    )}
-                    <button
-                      onClick={() => setShowDotProductViz(!showDotProductViz)}
-                      className="w-full mt-2 px-3 py-2 text-xs rounded-lg border transition-all"
-                      style={{
-                        backgroundColor: showDotProductViz ? 'var(--color-paper)' : 'transparent',
-                        borderColor: 'var(--color-rule)',
-                        color: 'var(--color-muted)',
-                      }}
-                    >
-                      {showDotProductViz ? '▼ Hide geometric meaning' : '▶ Show geometric meaning'}
-                    </button>
-                    {showDotProductViz && v1 && v2 && (
-                      <div className="mt-2 p-3 rounded-lg border" style={{ backgroundColor: 'var(--color-paper)', borderColor: 'var(--color-rule)' }}>
-                        <div className="text-xs font-semibold mb-2" style={{ color: 'var(--color-ink)' }}>
-                          What does the dot product mean?
-                        </div>
-                        <div className="space-y-2 text-xs" style={{ color: 'var(--color-muted)' }}>
-                          <div className="p-2 rounded" style={{ backgroundColor: 'var(--color-paper-2)' }}>
-                            <div className="font-semibold mb-1" style={{ color: v1.color }}>{v1.name}</div>
-                            <InlineText text={`\\mathbf{v}_1 = \\begin{pmatrix}${v1.coords[0].toFixed(1)} \\\\ ${v1.coords[1].toFixed(1)}\\end{pmatrix}`} />
-                            <div><InlineText text={`\\|${v1.name}\\| = ${mag1.toFixed(2)}`} /></div>
-                          </div>
-                          <div className="p-2 rounded" style={{ backgroundColor: 'var(--color-paper-2)' }}>
-                            <div className="font-semibold mb-1" style={{ color: v2.color }}>{v2.name}</div>
-                            <InlineText text={`\\mathbf{v}_2 = \\begin{pmatrix}${v2.coords[0].toFixed(1)} \\\\ ${v2.coords[1].toFixed(1)}\\end{pmatrix}`} />
-                            <div><InlineText text={`\\|${v2.name}\\| = ${mag2.toFixed(2)}`} /></div>
-                            <div><InlineText text={`\\|${v1.name}\\|\\cos(\\theta) = \\text{proj}_{\\mathbf{v}_2}(\\mathbf{v}_1)`} /></div>
-                          </div>
-                          <div className="p-2 rounded border" style={{ borderColor: 'var(--color-sum)', backgroundColor: 'rgba(88,0,150,0.05)' }}>
-                            <div className="font-semibold mb-1" style={{ color: 'var(--color-sum)' }}>Geometric Formula</div>
-                            <InlineText text={`${v1.name} \\cdot ${v2.name} = \\|${v1.name}\\| \\times \\|${v2.name}\\| \\times \\cos(\\theta) = ${mag1.toFixed(2)} \\times ${mag2.toFixed(2)} \\times \\cos(${angle.toFixed(0)}^\\circ)`} />
-                            <div className="font-semibold mt-1" style={{ color: 'var(--color-sum)' }}>
-                              <InlineText text={`= ${dotProd.toFixed(3)}`} />
-                            </div>
-                          </div>
-                          <div className="p-2 rounded" style={{ backgroundColor: 'var(--color-paper-2)' }}>
-                            <div className="font-semibold mb-1">Interpretation</div>
-                            <div>The dot product = <strong>how much {v1.name} overlaps with {v2.name}</strong></div>
-                            <InlineText text={`\\text{proj}_{\\mathbf{v}_2}(\\mathbf{v}_1) = \\|${v1.name}\\|\\cos(\\theta)`} />
-                            <div>Multiplying by <InlineText text={`\\|${v2.name}\\|`} /> gives the total overlap</div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
+                  </div>
+
+                  {/* Angle indicator */}
+                  {dotProd < 0 ? (
+                    <div className="text-center text-xs p-1.5 rounded-lg mt-2" style={{ backgroundColor: 'rgba(200,155,50,0.15)', color: 'oklch(65% 0.08 70)' }}>
+                      ↓ Obtuse angle ({angle.toFixed(0)}°) — opposite direction
+                    </div>
+                  ) : Math.abs(dotProd) < 0.001 ? (
+                    <div className="text-center text-xs p-1.5 rounded-lg mt-2" style={{ backgroundColor: 'rgba(100,170,195,0.12)', color: 'oklch(52% 0.08 195)' }}>
+                      ⊥ Perpendicular ({angle.toFixed(0)}°) — no overlap
+                    </div>
+                  ) : (
+                    <div className="text-center text-xs p-1.5 rounded-lg mt-2" style={{ backgroundColor: 'rgba(75,180,140,0.12)', color: 'oklch(52% 0.08 155)' }}>
+                      ↑ Acute angle ({angle.toFixed(0)}°) — similar direction
+                    </div>
+                  )}
+
+                  {/* Magnitudes */}
+                  <div className="text-center text-xs pt-2 border-t" style={{ color: 'var(--color-muted)', borderColor: 'var(--color-rule)' }}>
+                    <span dangerouslySetInnerHTML={{ __html: katex.renderToString(`||\\vec{a}|| = ${mag1.toFixed(2)}, ||\\vec{b}|| = ${mag2.toFixed(2)}, angle = ${angle.toFixed(0)} deg`, { displayMode: false, throwOnError: false }) }} />
                   </div>
                 </div>
               )}
