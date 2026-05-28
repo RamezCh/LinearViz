@@ -122,6 +122,16 @@ export function FormulaRow({ label, children }) {
 export function MatrixDisplay({ matrix, highlight = null, className = '' }) {
   if (!matrix || !Array.isArray(matrix) || matrix.length !== 2) return null;
 
+  const getColor = (row, col) => {
+    const key = `${row}${col}`;
+    if (highlight === key) return 'purple';
+    return col === 0 ? 'blue' : 'green';
+  };
+
+  const fmt = (v) => (typeof v === 'number' ? v.toFixed(2).replace(/\.?0+$/, '') || '0' : v);
+
+  const latexStr = `\\begin{pmatrix} ${matrix[0].map((v, j) => `\\color{${getColor(0, j)}}{${fmt(v)}}`).join(' & ')} \\\\ ${matrix[1].map((v, j) => `\\color{${getColor(1, j)}}{${fmt(v)}}`).join(' & ')} \\end{pmatrix}`;
+
   return (
     <span
       className={`math-inline ${className}`}
@@ -132,26 +142,40 @@ export function MatrixDisplay({ matrix, highlight = null, className = '' }) {
         fontWeight: '600',
       }}
       dangerouslySetInnerHTML={{
-        __html: katex.renderToString(
-          `\\begin{pmatrix} ${matrix[0].map((v, j) => `<span style="color: ${highlight === `0${j}` ? '#6366F1' : (j === 0 ? '#4A90E2' : '#7ED321')}">${typeof v === 'number' ? v.toFixed(2) : v}</span>`).join(' & ')} \\\\ ${matrix[1].map((v, j) => `<span style="color: ${highlight === `1${j}` ? '#6366F1' : (j === 0 ? '#4A90E2' : '#7ED321')}">${typeof v === 'number' ? v.toFixed(2) : v}</span>`).join(' & ')} \\end{pmatrix}`,
-          { displayMode: false, throwOnError: false }
-        )
+        __html: katex.renderToString(latexStr, { displayMode: false, throwOnError: false, trust: true })
       }}
     />
   );
 }
 
 export function Matrix({ matrix, name = 'M', highlight = null }) {
-  if (!matrix || !Array.isArray(matrix) || matrix.length !== 2) return null;
+  if (!matrix || !Array.isArray(matrix) || matrix.length !== 2) {
+    return (
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontFamily: 'var(--font-mono)', fontSize: '14px', color: 'var(--color-muted)' }}>
+        {name} = <span style={{ opacity: 0.5 }}>[invalid]</span>
+      </span>
+    );
+  }
+
+  const safeMatrix = matrix.map(row =>
+    row.map(v => (typeof v === 'number' && isFinite(v) ? v : 0))
+  );
+
+  const getColor = (row, col) => {
+    const key = `${row}${col}`;
+    if (highlight === key) return 'purple';
+    return col === 0 ? 'blue' : 'green';
+  };
+
+  const fmt = (v) => v.toFixed(2).replace(/\.?0+$/, '') || '0';
+
+  const latexStr = `${name} = \\begin{pmatrix} ${safeMatrix[0].map((v, j) => `\\color{${getColor(0, j)}}{${fmt(v)}}`).join(' & ')} \\\\ ${safeMatrix[1].map((v, j) => `\\color{${getColor(1, j)}}{${fmt(v)}}`).join(' & ')} \\end{pmatrix}`;
 
   return (
     <span
       style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
       dangerouslySetInnerHTML={{
-        __html: katex.renderToString(
-          `${name} = \\begin{pmatrix} ${matrix[0].map((v, j) => `<span style="color: ${highlight === `0${j}` ? '#6366F1' : (j === 0 ? '#4A90E2' : '#7ED321')}">${typeof v === 'number' ? v.toFixed(2) : v}</span>`).join(' &amp; ')} \\\\ ${matrix[1].map((v, j) => `<span style="color: ${highlight === `1${j}` ? '#6366F1' : (j === 0 ? '#4A90E2' : '#7ED321')}">${typeof v === 'number' ? v.toFixed(2) : v}</span>`).join(' &amp; ')} \\end{pmatrix}`,
-          { displayMode: false, throwOnError: false }
-        )
+        __html: katex.renderToString(latexStr, { displayMode: false, throwOnError: false, trust: true })
       }}
     />
   );

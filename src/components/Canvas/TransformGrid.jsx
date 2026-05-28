@@ -16,6 +16,9 @@ export default function TransformGrid({
   onZoomChange,
   highlightPoint = null,
   showOriginLabel = true,
+  overlayMatrix = null,
+  overlayLabel = null,
+  overlayOpacity = 0.35,
 }) {
   const svgRef = useRef(null);
   const [size, setSize] = useState({ w: 900, h: 700 });
@@ -216,6 +219,104 @@ export default function TransformGrid({
 
     return <g className="transformed-grid">{lines}</g>;
   }, [showGrid, animProgress, toCanvas, getTransformedPoint, darkMode, gridExtent]);
+
+  const overlayTransformedGrid = useMemo(() => {
+    if (!showGrid || !overlayMatrix || overlayOpacity <= 0) return null;
+    const lines = [];
+    const extent = Math.max(6, Math.ceil(Math.max(
+      Math.abs(overlayMatrix[0][0]) + Math.abs(overlayMatrix[0][1]),
+      Math.abs(overlayMatrix[1][0]) + Math.abs(overlayMatrix[1][1])
+    )) + 2);
+
+    const getOverlayPoint = (px, py) => ({
+      x: overlayMatrix[0][0] * px + overlayMatrix[0][1] * py,
+      y: overlayMatrix[1][0] * px + overlayMatrix[1][1] * py,
+    });
+
+    for (let i = -extent; i <= extent; i++) {
+      const points = [];
+      for (let j = -extent; j <= extent; j++) {
+        const tp = getOverlayPoint(i, j);
+        const p = toCanvas(tp.x, tp.y);
+        points.push(`${p.x},${p.y}`);
+      }
+
+      lines.push(
+        <polyline
+          key={`overlay-v-${i}`}
+          points={points.join(' ')}
+          fill="none"
+          stroke={`rgba(139, 92, 246, ${overlayOpacity})`}
+          strokeWidth={i === 0 ? 2 : 1}
+          strokeDasharray={i === 0 ? 'none' : '4 3'}
+        />
+      );
+    }
+
+    for (let i = -extent; i <= extent; i++) {
+      const points = [];
+      for (let j = -extent; j <= extent; j++) {
+        const tp = getOverlayPoint(j, i);
+        const p = toCanvas(tp.x, tp.y);
+        points.push(`${p.x},${p.y}`);
+      }
+
+      lines.push(
+        <polyline
+          key={`overlay-h-${i}`}
+          points={points.join(' ')}
+          fill="none"
+          stroke={`rgba(139, 92, 246, ${overlayOpacity})`}
+          strokeWidth={i === 0 ? 2 : 1}
+          strokeDasharray={i === 0 ? 'none' : '4 3'}
+        />
+      );
+    }
+
+    return <g className="overlay-grid">{lines}</g>;
+  }, [showGrid, overlayMatrix, overlayOpacity, toCanvas]);
+
+  const overlayBasisVectors = useMemo(() => {
+    if (!overlayMatrix || overlayOpacity <= 0) return null;
+    const overlayColor = '#8B5CF6';
+
+    const drawArrow = (fromX, fromY, toX, toY, label, labelOffset = -26) => {
+      const origin = toCanvas(0, 0);
+      const start = toCanvas(fromX, fromY);
+      const end = toCanvas(toX, toY);
+      const dx = end.x - start.x;
+      const dy = end.y - start.y;
+      const length = Math.sqrt(dx * dx + dy * dy);
+
+      if (length < 10) return null;
+
+      const angle = Math.atan2(dy, dx);
+      const headLen = Math.min(14, length * 0.22);
+      const headAngle = Math.PI / 6;
+
+      const head1 = { x: end.x - headLen * Math.cos(angle - headAngle), y: end.y - headLen * Math.sin(angle - headAngle) };
+      const head2 = { x: end.x - headLen * Math.cos(angle + headAngle), y: end.y - headLen * Math.sin(angle + headAngle) };
+
+      const midX = (start.x + end.x) / 2;
+      const midY = (start.y + end.y) / 2;
+
+      return (
+        <g opacity={overlayOpacity}>
+          <line x1={start.x} y1={start.y} x2={end.x} y2={end.y} stroke={overlayColor} strokeWidth={3} strokeLinecap="round" />
+          <polygon points={`${end.x},${end.y} ${head1.x},${head1.y} ${head2.x},${head2.y}`} fill={overlayColor} />
+          <rect x={midX - 10} y={midY + labelOffset} width={20} height={18} rx={4} fill={darkMode ? 'rgba(30,41,59,0.9)' : 'rgba(255,255,255,0.9)'} />
+          <text x={midX} y={midY + labelOffset + 12} fill={overlayColor} fontSize={11} fontWeight="700" textAnchor="middle">{label}</text>
+        </g>
+      );
+    };
+
+    return (
+      <g className="overlay-basis">
+        {drawArrow(0, 0, overlayMatrix[0][0], overlayMatrix[1][0], 'î')}
+        {drawArrow(0, 0, overlayMatrix[0][1], overlayMatrix[1][1], 'ĵ', -16)}
+      </g>
+    );
+  }, [overlayMatrix, overlayOpacity, toCanvas, darkMode]);
 
   const originMarker = useMemo(() => {
     const pos = toCanvas(0, 0);
@@ -701,7 +802,9 @@ export default function TransformGrid({
     >
       {backgroundGridLines}
       {gridTickLabels}
+      {overlayTransformedGrid}
       {transformedGridLines}
+      {overlayBasisVectors}
       {originMarker}
       {sampleShape}
       {determinantParallelogram}

@@ -68,6 +68,11 @@ export default function TransformationsModule() {
   const [showBasis, setShowBasis] = useState(true);
   const [showShape, setShowShape] = useState(true);
   const [showCompose, setShowCompose] = useState(false);
+  const [composeOrder, setComposeOrder] = useState('AB');
+  const [composeAnimStep, setComposeAnimStep] = useState(0);
+  const [composeViewMode, setComposeViewMode] = useState('preview');
+  const [animationPhase, setAnimationPhase] = useState(0);
+  const [animationProgress, setAnimationProgress] = useState(0);
   const [learnMode, setLearnMode] = useState(true);
   const [animProgress, setAnimProgress] = useState(1);
 
@@ -79,10 +84,21 @@ export default function TransformationsModule() {
   const lastPos = useRef({ x: 0, y: 0 });
 
   const det = useMemo(() => det2x2(matrix), [matrix]);
+  const detB = useMemo(() => det2x2(matrixB), [matrixB]);
   const invertible = useMemo(() => isInvertible(matrix), [matrix]);
   const composedMatrix = useMemo(() => {
-    try { return multiply(matrix, matrixB); } catch { return null; }
-  }, [matrix, matrixB]);
+    try {
+      const result = composeOrder === 'AB' ? multiply(matrix, matrixB) : multiply(matrixB, matrix);
+      if (!result || result.length !== 2 || result[0].length !== 2 || result[1].length !== 2) {
+        return [[1, 0], [0, 1]];
+      }
+      const safe = result.map(row => row.map(v => (isFinite(v) ? v : 0)));
+      return safe;
+    } catch {
+      return [[1, 0], [0, 1]];
+    }
+  }, [matrix, matrixB, composeOrder]);
+  const detCompose = useMemo(() => det2x2(composedMatrix), [composedMatrix]);
 
   const transformType = useMemo(() => {
     const m = matrix;
@@ -140,6 +156,48 @@ export default function TransformationsModule() {
     setQuickTipVisible(true);
     setActivePresetForTip(null);
   }, [currentStep]);
+
+  useEffect(() => {
+    setAnimationPhase(0);
+    if (!showCompose) {
+      setComposeAnimStep(0);
+      return;
+    }
+    setComposeAnimStep(1);
+    const timer2 = setTimeout(() => setComposeAnimStep(2), 600);
+    return () => {
+      clearTimeout(timer2);
+    };
+  }, [showCompose, matrix, matrixB, composeOrder]);
+
+  const playAnimation = useCallback(() => {
+    setAnimationPhase(1);
+    setAnimationProgress(0);
+    
+    const startMatrix = composeOrder === 'AB' ? matrix : matrixB;
+    const endMatrix = composedMatrix;
+    
+    const startTime = performance.now();
+    const duration = 1500;
+    
+    const animate = (now) => {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      setAnimationProgress(progress);
+      
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      } else {
+        setAnimationPhase(2);
+        setTimeout(() => {
+          setAnimationPhase(0);
+          setAnimationProgress(0);
+        }, 500);
+      }
+    };
+    
+    requestAnimationFrame(animate);
+  }, [composeOrder, matrix, matrixB, composedMatrix]);
 
   const applyPreset = useCallback((preset) => {
     setSelectedPreset(preset);
@@ -209,11 +267,11 @@ export default function TransformationsModule() {
   }, []);
 
   const isDraggingEntry = useRef(false);
-  const dragEntryRef = useRef({ row: 0, col: 0, startY: 0, startValue: 0 });
+  const dragEntryRef = useRef({ row: 0, col: 0, startY: 0, startValue: 0, isMatrixB: false });
 
-  const handleDragEntry = useCallback((row, col, value, clientY) => {
+  const handleDragEntry = useCallback((row, col, value, clientY, isMatrixB = false) => {
     isDraggingEntry.current = true;
-    dragEntryRef.current = { row, col, startY: clientY, startValue: value };
+    dragEntryRef.current = { row, col, startY: clientY, startValue: value, isMatrixB };
     document.body.style.userSelect = 'none';
     document.body.style.cursor = 'ns-resize';
   }, []);
@@ -227,12 +285,16 @@ export default function TransformationsModule() {
     }
     if (isDraggingEntry.current) {
       e.preventDefault();
-      const { row, col, startY, startValue } = dragEntryRef.current;
+      const { row, col, startY, startValue, isMatrixB } = dragEntryRef.current;
       const deltaY = startY - e.clientY;
       const newValue = Math.max(-3, Math.min(3, startValue + deltaY * 0.03));
-      handleMatrixEntryChange(row, col, newValue);
+      if (isMatrixB) {
+        handleMatrixBEntryChange(row, col, newValue);
+      } else {
+        handleMatrixEntryChange(row, col, newValue);
+      }
     }
-  }, [handleMatrixEntryChange]);
+  }, [handleMatrixEntryChange, handleMatrixBEntryChange]);
 
   const handleMouseUp = useCallback(() => {
     isPanning.current = false;
@@ -259,6 +321,8 @@ export default function TransformationsModule() {
     setZoom(DEFAULT_ZOOM);
     setPan({ x: 0, y: 0 });
     setAnimProgress(1);
+    setComposeOrder('AB');
+    setComposeAnimStep(0);
   }, []);
 
   return (
@@ -402,18 +466,39 @@ export default function TransformationsModule() {
           <div className="flex-1 min-h-0 min-w-0 relative">
             <div ref={canvasRef} className="w-full h-full select-none" style={{ backgroundColor: 'var(--color-paper)', touchAction: 'none', minHeight: '500px', userSelect: 'none', WebkitUserSelect: 'none' }}
               onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
-              <TransformGrid
-                matrix={matrix}
-                animProgress={animProgress}
-                showGrid={showGrid}
-                showBasis={showBasis}
-                showShape={showShape}
-                zoom={zoom}
-                pan={pan}
-                onZoomChange={handleZoomChange}
-                onDragEntry={handleDragEntry}
-                interactive={true}
-              />
+              {(() => {
+                let displayMatrix = showCompose ? composedMatrix : matrix;
+                let showOverlay = false;
+                
+                if (animationPhase === 1) {
+                  const startM = composeOrder === 'AB' ? matrix : matrixB;
+                  const endM = composedMatrix;
+                  const t = animationProgress;
+                  const easeT = t * t * (3 - 2 * t);
+                  displayMatrix = [
+                    [startM[0][0] + (endM[0][0] - startM[0][0]) * easeT, startM[0][1] + (endM[0][1] - startM[0][1]) * easeT],
+                    [startM[1][0] + (endM[1][0] - startM[1][0]) * easeT, startM[1][1] + (endM[1][1] - startM[1][1]) * easeT],
+                  ];
+                  showOverlay = true;
+                }
+                
+                return (
+                  <TransformGrid
+                    matrix={displayMatrix}
+                    animProgress={animProgress}
+                    showGrid={showGrid}
+                    showBasis={showBasis}
+                    showShape={showShape}
+                    zoom={zoom}
+                    pan={pan}
+                    onZoomChange={handleZoomChange}
+                    onDragEntry={handleDragEntry}
+                    interactive={!showCompose && animationPhase === 0}
+                    overlayMatrix={showOverlay ? (composeOrder === 'AB' ? matrix : matrixB) : 0}
+                    overlayOpacity={showOverlay ? 0.4 : 0}
+                  />
+                );
+              })()}
             </div>
 
             {/* Preset Sliders */}
@@ -457,20 +542,165 @@ export default function TransformationsModule() {
 
             {/* Compose 3-Panel View */}
             {showCompose && (
-              <div className="absolute bottom-3 left-3 right-3 p-3 rounded-xl" style={{ backgroundColor: 'color-mix(in oklch, var(--color-paper) 94%, transparent)', backdropFilter: 'blur(12px)', border: '1px solid var(--color-rule)' }}>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-semibold" style={{ color: 'var(--color-accent)' }}>Compose: A × B = Result</span>
-                  <span className="text-xs font-mono" style={{ color: 'var(--color-muted)' }}>det = {det.toFixed(2)}</span>
+              <div className="absolute bottom-3 left-3 right-3 p-4 rounded-xl" style={{ backgroundColor: 'color-mix(in oklch, var(--color-paper) 96%, transparent)', backdropFilter: 'blur(16px)', border: '1px solid var(--color-rule)', boxShadow: '0 8px 32px rgba(0,0,0,0.12)' }}>
+                {/* Header with Order Toggle and View Controls */}
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs font-semibold" style={{ color: 'var(--color-accent)' }}>Compose</span>
+                    <div className="flex items-center bg-black/5 rounded-lg p-0.5">
+                      <button
+                        onClick={() => setComposeOrder('AB')}
+                        className="px-2.5 py-1 text-xs font-bold rounded-md transition-all duration-200"
+                        style={composeOrder === 'AB' ? { backgroundColor: 'var(--color-accent)', color: 'white' } : { backgroundColor: 'transparent', color: 'var(--color-muted)' }}
+                      >
+                        A × B
+                      </button>
+                      <button
+                        onClick={() => setComposeOrder('BA')}
+                        className="px-2.5 py-1 text-xs font-bold rounded-md transition-all duration-200"
+                        style={composeOrder === 'BA' ? { backgroundColor: 'var(--color-accent)', color: 'white' } : { backgroundColor: 'transparent', color: 'var(--color-muted)' }}
+                      >
+                        B × A
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {/* View Mode Toggle */}
+                    <div className="flex items-center bg-black/5 rounded-lg p-0.5">
+                      <button
+                        onClick={() => setComposeViewMode('preview')}
+                        className="px-2.5 py-1 text-xs font-semibold rounded-md transition-all duration-200"
+                        style={composeViewMode === 'preview' ? { backgroundColor: 'var(--color-accent)', color: 'white' } : { backgroundColor: 'transparent', color: 'var(--color-muted)' }}
+                      >
+                        Preview
+                      </button>
+                      <button
+                        onClick={playAnimation}
+                        className="px-2.5 py-1 text-xs font-semibold rounded-md transition-all duration-200 flex items-center gap-1"
+                        style={animationPhase > 0 ? { backgroundColor: 'var(--color-accent)', color: 'white' } : { backgroundColor: 'transparent', color: 'var(--color-muted)' }}
+                      >
+                        <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M8 5v14l11-7z" />
+                        </svg>
+                        Animate
+                      </button>
+                    </div>
+                    {/* Step Animation Indicator */}
+                    <div className="flex items-center gap-2 text-xs">
+                      <div className="flex items-center gap-1.5">
+                        <div className={`px-2 py-0.5 rounded-full font-semibold transition-all ${composeAnimStep >= 1 ? 'ring-2 ring-offset-1' : ''} ${animationPhase === 1 ? 'animate-pulse' : ''}`}
+                          style={{ backgroundColor: 'rgba(139,92,246,0.2)', color: '#8B5CF6', ringColor: '#8B5CF6' }}>
+                          {composeOrder === 'AB' ? 'A' : 'B'}
+                        </div>
+                        <svg className="w-3 h-3" style={{ color: 'var(--color-muted)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                        </svg>
+                        <div className={`px-2 py-0.5 rounded-full font-semibold transition-all ${composeAnimStep >= 2 ? 'ring-2 ring-offset-1' : ''}`}
+                          style={{ backgroundColor: 'rgba(126,211,33,0.2)', color: '#7ED321', ringColor: '#7ED321' }}>
+                          AB
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-xs font-mono px-2 py-1 rounded-lg" style={{ backgroundColor: Math.abs(detCompose) < 1e-10 ? 'rgba(220,53,69,0.15)' : detCompose > 0 ? 'rgba(126,211,33,0.15)' : 'rgba(220,53,69,0.15)', color: Math.abs(detCompose) < 1e-10 ? '#DC3749' : detCompose > 0 ? '#7ED321' : '#DC3749' }}>
+                      det = {detCompose.toFixed(2)}
+                    </div>
+                  </div>
                 </div>
-                <div className="flex items-center justify-center gap-1 text-lg font-bold" style={{ color: 'var(--color-muted)', fontFamily: 'var(--font-mono)' }}>
-                  <Matrix matrix={matrix} name="A" />
-                  <span className="mx-2">×</span>
-                  <Matrix matrix={matrixB} name="B" />
-                  <span className="mx-2">=</span>
+
+                {/* Matrices */}
+                <div className="flex items-center justify-center gap-2 text-base font-bold" style={{ color: 'var(--color-muted)', fontFamily: 'var(--font-mono)' }}>
+                  <div className={`px-2 py-1 rounded-lg transition-all duration-300 ${animationPhase === 1 ? 'ring-2 ring-offset-1 ring-purple-500 bg-purple-500/10 scale-110' : ''}`}>
+                    <Matrix matrix={composeOrder === 'AB' ? matrix : matrixB} name={composeOrder === 'AB' ? 'A' : 'B'} />
+                  </div>
+                  <span className="mx-1 text-lg" style={{ color: 'var(--color-muted)' }}>×</span>
+                  <Matrix matrix={composeOrder === 'AB' ? matrixB : matrix} name={composeOrder === 'AB' ? 'B' : 'A'} />
+                  <span className="mx-2 text-lg" style={{ color: 'var(--color-muted)' }}>=</span>
                   <Matrix matrix={composedMatrix} name="AB" />
                 </div>
-                <div className="text-xs text-center mt-2" style={{ color: 'var(--color-muted)' }}>
-                  det(A×B) = det(A) × det(B) = {det.toFixed(2)} × {det2x2(matrixB).toFixed(2)} = {(det * det2x2(matrixB)).toFixed(2)}
+
+                {/* B Inputs */}
+                <div className="mt-3 pt-3 border-t" style={{ borderColor: 'var(--color-rule)' }}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold" style={{ color: 'var(--color-accent)' }}>Edit Matrix B</span>
+                    <div className="flex gap-1">
+                      {[
+                        { key: 'identity', label: 'Identity', color: '#6B7280' },
+                        { key: 'rotate', label: 'Rotate 45°', color: '#8B5CF6' },
+                        { key: 'stretch', label: 'Stretch', color: '#F59E0B' },
+                        { key: 'shear', label: 'Shear', color: '#EC4899' },
+                      ].map(preset => (
+                        <button
+                          key={preset.key}
+                          onClick={() => {
+                            let m;
+                            switch (preset.key) {
+                              case 'identity': m = [[1, 0], [0, 1]]; break;
+                              case 'rotate': m = rotationMatrix(45); break;
+                              case 'stretch': m = [[2, 0], [0, 1]]; break;
+                              case 'shear': m = shearMatrix(0.5); break;
+                              default: m = [[1, 0], [0, 1]];
+                            }
+                            setMatrixB(m);
+                          }}
+                          className="px-2 py-1 text-xs font-medium rounded-md transition-all hover:scale-105"
+                          style={{ backgroundColor: `${preset.color}15`, color: preset.color, border: `1px solid ${preset.color}30` }}
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 max-w-[200px] mx-auto">
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs font-bold w-4" style={{ color: '#F59E0B' }}>w</span>
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={matrixB[0][0].toFixed(2)}
+                        onChange={e => handleMatrixBEntryChange(0, 0, parseFloat(e.target.value) || 0)}
+                        className="flex-1 px-2 py-1.5 text-sm text-center rounded-lg font-mono outline-none"
+                        style={{ backgroundColor: 'var(--color-paper)', border: '1px solid var(--color-rule)', color: '#F59E0B' }}
+                      />
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs font-bold w-4" style={{ color: '#EC4899' }}>x</span>
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={matrixB[0][1].toFixed(2)}
+                        onChange={e => handleMatrixBEntryChange(0, 1, parseFloat(e.target.value) || 0)}
+                        className="flex-1 px-2 py-1.5 text-sm text-center rounded-lg font-mono outline-none"
+                        style={{ backgroundColor: 'var(--color-paper)', border: '1px solid var(--color-rule)', color: '#EC4899' }}
+                      />
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs font-bold w-4" style={{ color: '#F59E0B' }}>y</span>
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={matrixB[1][0].toFixed(2)}
+                        onChange={e => handleMatrixBEntryChange(1, 0, parseFloat(e.target.value) || 0)}
+                        className="flex-1 px-2 py-1.5 text-sm text-center rounded-lg font-mono outline-none"
+                        style={{ backgroundColor: 'var(--color-paper)', border: '1px solid var(--color-rule)', color: '#F59E0B' }}
+                      />
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs font-bold w-4" style={{ color: '#EC4899' }}>z</span>
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={matrixB[1][1].toFixed(2)}
+                        onChange={e => handleMatrixBEntryChange(1, 1, parseFloat(e.target.value) || 0)}
+                        className="flex-1 px-2 py-1.5 text-sm text-center rounded-lg font-mono outline-none"
+                        style={{ backgroundColor: 'var(--color-paper)', border: '1px solid var(--color-rule)', color: '#EC4899' }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Formula */}
+                <div className="text-xs text-center mt-3 pt-2 border-t" style={{ borderColor: 'var(--color-rule)', color: 'var(--color-muted)' }}>
+                  det(A×B) = det(A) × det(B) = {det.toFixed(2)} × {detB.toFixed(2)} = {detCompose.toFixed(2)}
                 </div>
               </div>
             )}
